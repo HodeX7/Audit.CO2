@@ -1,19 +1,28 @@
-"""One small door to the language model.
+"""One small, model-agnostic door to any language model.
 
-Provider is chosen by LLM_PROVIDER:
-  nvidia     (default, free trial) -> https://integrate.api.nvidia.com/v1, key NVIDIA_API_KEY
-  anthropic  (optional)            -> https://api.anthropic.com/v1/ (OpenAI SDK compatibility layer),
-                                      key ANTHROPIC_API_KEY
+Any provider that speaks the OpenAI chat-completions API works by settings alone:
 
-Both are called with the standard `openai` client, so switching is one setting.
-The model only PROPOSES extracted fields. It never does arithmetic, and code accepts a
-proposal only after the excerpt is found in the document (carbonroom/ingest/extract.py).
+  LLM_PROVIDER        preset        base URL                                  key
+  nvidia (default)    free trial    https://integrate.api.nvidia.com/v1       NVIDIA_API_KEY (NVIDIA_BASE_URL overrides)
+  anthropic           Claude        https://api.anthropic.com/v1/             ANTHROPIC_API_KEY (CR_ANTHROPIC_BASE_URL)
+  openai              OpenAI        https://api.openai.com/v1                 OPENAI_API_KEY
+  openrouter          many vendors  https://openrouter.ai/api/v1              OPENROUTER_API_KEY
+  ollama              local models  http://localhost:11434/v1                 none
+  openai_compatible   anything else LLM_BASE_URL (required)                   LLM_API_KEY (optional)
 
-Rate limits: NVIDIA's free tier allows about 40 requests/minute per account and returns
-HTTP 429 with Retry-After when exceeded. We throttle to CR_LLM_RPM (default 35) and retry
-with backoff. Sources: NVIDIA developer forum NIM FAQ; docs.claude.com OpenAI SDK compatibility
-page (which says temperature < 1 and response_format=json_object are rejected on recent Claude
-models, so we send neither to Anthropic).
+LLM_BASE_URL / LLM_API_KEY override any preset, LLM_TEMPERATURE sets or disables temperature, and each
+setting can be overridden per task: LLM_MODEL_EXTRACT, LLM_PROVIDER_EXTRACT, ... (task "extract" is
+document extraction; teammates may use their own task names). A provider that does not speak this API
+can be plugged in with register_provider(..., client_factory=...).
+
+The model only PROPOSES extracted fields. It never does arithmetic, and code accepts a proposal only
+after the excerpt is found in the document (carbonroom/ingest/extract.py) - which is what makes it safe
+to swap models.
+
+Sources: NVIDIA NIM FAQ (about 40 requests/minute, 429 + Retry-After); Claude docs "OpenAI SDK
+compatibility" (temperature < 1 and response_format=json_object are rejected on recent models);
+OpenRouter docs (base URL https://openrouter.ai/api/v1); Ollama "OpenAI compatibility" blog
+(http://localhost:11434/v1, api_key required but unused).
 """
 
 from __future__ import annotations
@@ -22,27 +31,65 @@ import json
 import re
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from carbonroom import config
 
-PROVIDERS = {
-    "nvidia": {
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "key_env": "NVIDIA_API_KEY",
-        "base_env": "NVIDIA_BASE_URL",
-        # No default: NVIDIA retires hosted models (meta/llama-3.3-70b-instruct returned HTTP 410 on
-        # 2026-11-03) and some listed models answer 404. Pick one with `carbonroom llm probe` + `llm bench`.
-        "default_model": None,
-    },
-    "anthropic": {
-        "base_url": "https://api.anthropic.com/v1/",
-        "key_env": "ANTHROPIC_API_KEY",
-        "base_env": "CR_ANTHROPIC_BASE_URL",  # not ANTHROPIC_BASE_URL: Claude Code may set that
-        "default_model": "claude-haiku-5-5",
-    },
-}
+TASK_OVERRIDE_FIELDS = ("PROVIDER", "MODEL", "BASE_URL", "API_KEY", "TEMPERATURE")
+KNOWN_TASKS = ("extract",)
+NO_KEY = "not-needed"  # the openai client requires a non-empty key even for local servers
+
+
+@dataclass(frozen=True)
+class ProviderSpec:
+    name: str
+    base_url: str | None
+    key_env: str | None  # None = no key needed
+    base_env: str | None = None
+    temperature: float | None = 0  # None = never send temperature
+    default_model: str | None = None
+    client_factory: Callable[["Provider"], Any] | None = None  # None = the openai client
+    note: str = ""
+
+
+PROVIDERS: dict[str, ProviderSpec] = {}
+
+
+def register_provider(
+    name: str,
+    *,
+    base_url: str | None = None,
+    key_env: str | None = None,
+    base_env: str | None = None,
+    temperature: float | None = 0,
+    default_model: str | None = None,
+    client_factory: Callable[["Provider"], Any] | None = None,
+    note: str = "",
+) -> ProviderSpec:
+    """Add (or replace) a provider preset. `client_factory(provider)` must return an object with
+    `.chat.completions.create(**kwargs)` returning an OpenAI-shaped response (and optionally
+    `.models.list()`), so any SDK can be wrapped in a few lines."""
+    spec = ProviderSpec(name, base_url, key_env, base_env, temperature, default_model, client_factory, note)
+    PROVIDERS[name] = spec
+    return spec
+
+
+# No default models: hosted models get retired (meta/llama-3.3-70b-instruct returned HTTP 410 on NVIDIA on
+# 2026-11-03). Pick one with `carbonroom llm probe` + `carbonroom llm bench` and set LLM_MODEL.
+register_provider("nvidia", base_url="https://integrate.api.nvidia.com/v1", key_env="NVIDIA_API_KEY",
+                  base_env="NVIDIA_BASE_URL", note="free trial; about 40 requests/minute")
+register_provider("anthropic", base_url="https://api.anthropic.com/v1/", key_env="ANTHROPIC_API_KEY",
+                  base_env="CR_ANTHROPIC_BASE_URL",  # not ANTHROPIC_BASE_URL: Claude Code may set that
+                  temperature=None, note="OpenAI SDK compatibility layer; no temperature")
+register_provider("openai", base_url="https://api.openai.com/v1", key_env="OPENAI_API_KEY", temperature=None,
+                  note="no temperature (reasoning models reject it)")
+register_provider("openrouter", base_url="https://openrouter.ai/api/v1", key_env="OPENROUTER_API_KEY",
+                  note="one key, many vendors' models")
+register_provider("ollama", base_url="http://localhost:11434/v1", key_env=None,
+                  note="local models, no key, no network")
+register_provider("openai_compatible", base_url=None, key_env=None,
+                  note="any OpenAI-compatible server: set LLM_BASE_URL (and LLM_API_KEY if it needs one)")
 
 
 class LLMError(RuntimeError):
@@ -65,35 +112,56 @@ class Provider:
     base_url: str
     api_key: str
     model: str
+    temperature: float | None = 0
+    task: str | None = None
+    spec: ProviderSpec | None = field(default=None, compare=False, repr=False)
 
     @property
     def label(self) -> str:
         return f"llm:{self.name}:{self.model}"
 
 
-def provider(model: str | None = None, *, need_model: bool = True) -> Provider:
-    name = (config.env("LLM_PROVIDER", "nvidia") or "nvidia").lower()
+def setting(name: str, task: str | None = None, default: str | None = None) -> str | None:
+    """LLM_<NAME>_<TASK> if set, else LLM_<NAME>, else default."""
+    if task:
+        value = config.env(f"LLM_{name}_{task.upper()}")
+        if value is not None:
+            return value
+    return config.env(f"LLM_{name}", default)
+
+
+def _temperature(spec: ProviderSpec, task: str | None) -> float | None:
+    raw = setting("TEMPERATURE", task)
+    if raw is None:
+        return spec.temperature
+    if raw.strip().lower() in ("none", "off", "unset", ""):
+        return None
+    return float(raw)
+
+
+def provider(model: str | None = None, *, need_model: bool = True, task: str | None = None) -> Provider:
+    """Resolve provider, base URL, key, model and temperature from the environment (per task if given)."""
+    name = (setting("PROVIDER", task, "nvidia") or "nvidia").lower()
     if name not in PROVIDERS:
-        raise LLMNotConfigured(f"LLM_PROVIDER={name!r} is not supported (use nvidia or anthropic)")
+        raise LLMNotConfigured(f"LLM_PROVIDER={name!r} is not supported; use one of {', '.join(sorted(PROVIDERS))}")
     spec = PROVIDERS[name]
-    key = config.env(spec["key_env"])
-    if not key:
-        raise LLMNotConfigured(f"{spec['key_env']} is not set")
-    chosen = model or config.env("LLM_MODEL", spec["default_model"])
+    base_url = setting("BASE_URL", task) or (config.env(spec.base_env) if spec.base_env else None) or spec.base_url
+    if not base_url:
+        raise LLMNotConfigured(f"LLM_PROVIDER={name} needs LLM_BASE_URL")
+    key = setting("API_KEY", task) or (config.env(spec.key_env) if spec.key_env else None)
+    if spec.key_env and not key:
+        raise LLMNotConfigured(f"{spec.key_env} is not set")
+    chosen = model or setting("MODEL", task, spec.default_model)
     if need_model and not chosen:
         raise LLMNotConfigured("LLM_MODEL is not set; find a working one with `carbonroom llm probe`, "
                                "then compare with `carbonroom llm bench`")
-    return Provider(
-        name=name,
-        base_url=config.env(spec["base_env"], spec["base_url"]),
-        api_key=key,
-        model=chosen or "",
-    )
+    return Provider(name=name, base_url=base_url, api_key=key or NO_KEY, model=chosen or "",
+                    temperature=_temperature(spec, task), task=task, spec=spec)
 
 
-def is_configured() -> bool:
+def is_configured(task: str | None = None) -> bool:
     try:
-        provider()
+        provider(task=task)
     except LLMNotConfigured:
         return False
     return True
@@ -129,6 +197,8 @@ def limiter() -> RateLimiter:
 
 
 def _client(p: Provider):
+    if p.spec is not None and p.spec.client_factory is not None:
+        return p.spec.client_factory(p)
     from openai import OpenAI
 
     # NVIDIA's free endpoints sometimes hang; a short timeout + few attempts keeps a stuck model from
@@ -151,6 +221,7 @@ def chat(
     messages: list[dict[str, Any]],
     *,
     model: str | None = None,
+    task: str | None = None,
     max_tokens: int = 1500,
     attempts: int | None = None,
     client: Any = None,
@@ -159,12 +230,12 @@ def chat(
     """Send a chat completion with throttling and retries. Returns (text, provider)."""
     import openai
 
-    p = provider(model)
+    p = provider(model, task=task)
     cli = client or _client(p)
     attempts = attempts or int(config.env("CR_LLM_ATTEMPTS", "3"))
     kwargs: dict[str, Any] = {"model": p.model, "messages": messages, "max_tokens": max_tokens}
-    if p.name == "nvidia":
-        kwargs["temperature"] = 0
+    if p.temperature is not None:
+        kwargs["temperature"] = p.temperature
     last: Exception | None = None
     for attempt in range(attempts):
         limiter().wait()
@@ -179,6 +250,8 @@ def chat(
         except openai.APIStatusError as exc:  # 4xx other than 429: not retryable
             raise LLMError(f"{p.name} API error {exc.status_code} for {p.model}: {_error_detail(exc)}",
                            status_code=exc.status_code) from exc
+        except Exception as exc:  # noqa: BLE001 - a plugged-in client failed; let auto mode fall back
+            raise LLMError(f"{p.name} client error for {p.model}: {exc}") from exc
     raise LLMError(f"{p.name} API failed after {attempts} attempts: {last}")
 
 
@@ -234,6 +307,24 @@ def _error_detail(exc: Exception) -> str:
 def list_models() -> list[str]:
     p = provider(need_model=False)
     return sorted(m.id for m in _client(p).models.list().data)
+
+
+def describe_providers() -> list[dict[str, Any]]:
+    """Every preset, whether it is configured right now, and which one is active."""
+    active = (setting("PROVIDER", None, "nvidia") or "nvidia").lower()
+    rows = []
+    for name, spec in sorted(PROVIDERS.items()):
+        key_ok = spec.key_env is None or bool(setting("API_KEY") or config.env(spec.key_env))
+        rows.append({
+            "name": name,
+            "active": name == active,
+            "base_url": (config.env(spec.base_env) if spec.base_env else None) or spec.base_url or "LLM_BASE_URL",
+            "key_env": spec.key_env or "-",
+            "key_set": key_ok,
+            "temperature": spec.temperature,
+            "note": spec.note,
+        })
+    return rows
 
 
 # Model ids that are clearly not chat/instruct models (embeddings, guards, OCR, speech, ...).

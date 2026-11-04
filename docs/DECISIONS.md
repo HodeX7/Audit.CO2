@@ -32,6 +32,8 @@ One line each: decision, why, date. Newest at the bottom of each owner's section
 
 - Docs: one design/architecture doc per feature in `docs/features/`, updated in the same PR as the code; `tests/test_docs.py` fails the build when docs and code disagree (functions, CLI commands and flags, env vars, paths, schema tables, cache labels, seed counts). One PR per feature from now on. 2026-11-03
 
+- Model-agnostic LLM layer: presets nvidia, anthropic, openai, openrouter, ollama (local, no key) and openai_compatible (any server via `LLM_BASE_URL`); every setting can be overridden per task (`LLM_<FIELD>_<TASK>`, e.g. `LLM_MODEL_EXTRACT`); non-OpenAI SDKs plug in via `register_provider(client_factory=...)`; no default model anywhere (Anthropic's default removed too). Why: the team wants agents that work with any model, and verification by code makes swapping models safe. 2026-11-03
+
 ## Richa (Calculation, Checker & Report)
 
 ## Akshar (Switch Room, Demo & Submission)

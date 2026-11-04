@@ -334,6 +334,30 @@ def cmd_ledger_verify(args) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _use_provider(args) -> None:
+    """`--provider X` on any llm command = LLM_PROVIDER=X for this run only."""
+    import os
+
+    if getattr(args, "provider", None):
+        os.environ["LLM_PROVIDER"] = args.provider
+
+
+def cmd_llm_providers(args) -> int:
+    from carbonroom import llm
+
+    rows = llm.describe_providers()
+    if args.json:
+        _print_json(rows)
+        return 0
+    print(f"{'':2}{'PROVIDER':<19}{'KEY':<22}{'BASE URL':<42}NOTE")
+    for r in rows:
+        key = r["key_env"] + (" (set)" if r["key_set"] and r["key_env"] != "-" else "")
+        print(f"{'*' if r['active'] else ' ':2}{r['name']:<19}{key:<22}{r['base_url']:<42}{r['note']}")
+    print("\n* = active (LLM_PROVIDER). Any OpenAI-compatible server works with LLM_PROVIDER=openai_compatible "
+          "+ LLM_BASE_URL.")
+    return 0
+
+
 def _listed_models(llm, args) -> list[str]:
     import re
 
@@ -348,6 +372,7 @@ def _listed_models(llm, args) -> list[str]:
 def cmd_llm_models(args) -> int:
     from carbonroom import llm
 
+    _use_provider(args)
     try:
         for model_id in _listed_models(llm, args):
             print(model_id)
@@ -364,6 +389,7 @@ def cmd_llm_probe(args) -> int:
     """One tiny call per model: which listed models actually answer for this key?"""
     from carbonroom import llm
 
+    _use_provider(args)
     try:
         if args.models:
             models = [m.strip() for m in args.models.split(",") if m.strip()]
@@ -397,8 +423,9 @@ def cmd_llm_bench(args) -> int:
     from carbonroom.ingest import extract, rules
     from carbonroom.ingest.seed import manifest
 
+    _use_provider(args)
     try:
-        default_model = llm.provider(need_model=False).model
+        default_model = llm.provider(need_model=False, task="extract").model
     except llm.LLMNotConfigured as exc:
         print(f"not configured: {exc}", file=sys.stderr)
         return 2
@@ -532,11 +559,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_ledger_verify)
 
     llm_p = sub.add_parser("llm", help="model provider tools").add_subparsers(dest="llm_cmd", required=True)
+    from carbonroom.llm import PROVIDERS
+
+    provider_help = "provider for this run (overrides LLM_PROVIDER)"
+    p = llm_p.add_parser("providers", help="list provider presets and which one is active")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_llm_providers)
     p = llm_p.add_parser("models", help="list chat models from the provider (GET /models)")
+    p.add_argument("--provider", choices=sorted(PROVIDERS), help=provider_help)
     p.add_argument("--all", dest="chat", action="store_false", help="include embedding/safety/OCR models")
     p.add_argument("--grep", help="regex filter, e.g. 'nemotron|deepseek|qwen'")
     p.set_defaults(func=cmd_llm_models)
     p = llm_p.add_parser("probe", help="one tiny call per model: which ones answer for this key?")
+    p.add_argument("--provider", choices=sorted(PROVIDERS), help=provider_help)
     p.add_argument("--models", help="comma-separated model ids (default: listed chat models)")
     p.add_argument("--grep", default="nemotron|deepseek|llama|qwen|mistral|gpt-oss|kimi|glm|gemma|phi",
                    help="regex filter on listed models")
@@ -544,6 +579,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=25)
     p.set_defaults(func=cmd_llm_probe)
     p = llm_p.add_parser("bench", help="score candidate models on the seed documents")
+    p.add_argument("--provider", choices=sorted(PROVIDERS), help=provider_help)
     p.add_argument("--models", help="comma-separated model ids")
     p.add_argument("--verbose", "-v", action="store_true")
     p.set_defaults(func=cmd_llm_bench)

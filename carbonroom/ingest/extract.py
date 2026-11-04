@@ -326,7 +326,7 @@ def llm_propose(file_name: str, pages: list[str], model: str | None = None,
         {"role": "system", "content": LLM_SYSTEM},
         {"role": "user", "content": f"File name: {file_name}\n\n{body}"},
     ]
-    proposal, p = llm.chat_json(messages, model=model, max_tokens=3000, attempts=attempts)  # room for reasoning
+    proposal, p = llm.chat_json(messages, model=model, task="extract", max_tokens=3000, attempts=attempts)
     proposal.setdefault("schema", PROPOSAL_SCHEMA)
     return proposal, p.label
 
@@ -348,7 +348,7 @@ def propose(
             return Proposed(cached["proposal"], f"cache:{cached['proposer']}", True)
     notes: list[str] = []
     if mode in ("auto", "llm"):
-        if llm.is_configured():
+        if llm.is_configured(task="extract"):
             try:
                 proposal, label = llm_propose(path.name, pages)
                 save_cache(sha256, path, proposal, label)

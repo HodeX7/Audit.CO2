@@ -44,7 +44,7 @@ def fake_llm(monkeypatch):
         return json.loads(json.dumps(state["reply"])), llm.Provider("nvidia", "http://fake", "k", model or "fake/model")
 
     monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-fake")
-    monkeypatch.setattr(llm, "is_configured", lambda: True)
+    monkeypatch.setattr(llm, "is_configured", lambda task=None: True)
     monkeypatch.setattr(llm, "chat_json", chat_json)
     return SimpleNamespace(calls=calls, state=state)
 
@@ -81,7 +81,7 @@ def test_cache_is_used_without_any_key(sites, fake_llm, monkeypatch):
     _drop_cache(_reno_path())
     pipeline.ingest_file(sites, _reno_path(), received_from="lena")  # fills the cache via the fake LLM
     calls_before = len(fake_llm.calls)
-    monkeypatch.setattr(llm, "is_configured", lambda: False)
+    monkeypatch.setattr(llm, "is_configured", lambda task=None: False)
     proposed = extract.propose(_reno_path(), extract.read_pages(_reno_path()), sha256_file(_reno_path()))
     assert proposed.from_cache and proposed.proposer == "cache:llm:nvidia:fake/model"
     assert len(fake_llm.calls) == calls_before
@@ -173,6 +173,7 @@ def test_chat_retries_429_using_retry_after(monkeypatch):
 def test_anthropic_provider_omits_temperature(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "anthropic")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("LLM_MODEL", "claude-haiku-5-5")
     monkeypatch.setattr(llm, "_LIMITER", llm.RateLimiter(1000, sleep=lambda s: None))
     client, completions = _fake_client()
     _, provider = llm.chat([{"role": "user", "content": "hi"}], client=client)

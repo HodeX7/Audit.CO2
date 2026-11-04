@@ -10,6 +10,14 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _ignore_developer_dotenv():
+    """Tests never read the developer's .env (real keys, real model), whatever order they run in."""
+    from carbonroom import config
+
+    config._ENV_LOADED = True
+
+
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     """A private copy of data/seed plus an empty inbox; CR_* variables point at it."""

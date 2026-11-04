@@ -84,6 +84,8 @@ def _subparsers(parser):
 def _commands_in(text: str):
     for segment in code_segments(text):
         for match in re.finditer(r"(?<![\w/.-])carbonroom\s+(.+)", segment):
+            if segment[: match.start()].rstrip().endswith(("from", "import")):
+                continue  # Python code, not a CLI command
             tokens = []
             for token in match.group(1).split():
                 if token in ("#", "&&", "|", ";", "\\") or token.startswith("#"):
@@ -151,11 +153,16 @@ def test_every_flag_of_our_commands_is_documented_in_feature_docs():
 
 
 def test_env_vars_read_by_the_code_are_in_env_example_and_vice_versa():
+    from carbonroom import llm
+
     code = "\n".join(read(p) for p in (REPO / "carbonroom").rglob("*.py"))
-    in_code = {v for v in re.findall(r'"([A-Z][A-Z0-9_]+)"', code) if v.startswith(ENV_PREFIXES)}
+    literal = {v for v in re.findall(r'"([A-Z][A-Z0-9_]+)"', code) if v.startswith(ENV_PREFIXES)}
+    generated = {f"LLM_{f}" for f in llm.TASK_OVERRIDE_FIELDS}  # read via llm.setting()
+    per_task = {f"LLM_{f}_{t.upper()}" for f in llm.TASK_OVERRIDE_FIELDS for t in llm.KNOWN_TASKS}
     example = set(re.findall(r"^#?\s*([A-Z][A-Z0-9_]+)=", read(REPO / ".env.example"), flags=re.M))
-    assert in_code - example == set(), "add these to .env.example"
-    assert {v for v in example if v.startswith(ENV_PREFIXES)} - in_code == set(), ".env.example lists unused vars"
+    assert (literal | generated) - example == set(), "add these to .env.example"
+    listed = {v for v in example if v.startswith(ENV_PREFIXES)}
+    assert listed - (literal | generated | per_task) == set(), ".env.example lists vars the code never reads"
 
 
 # --- paths, links and dotted names ----------------------------------------------------------------

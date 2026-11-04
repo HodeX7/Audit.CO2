@@ -121,6 +121,20 @@ Adding your own CLI commands without touching `cli.py`: create one of `carbonroo
 `carbonroom/check/cli.py`, `carbonroom/report/cli.py` or `carbonroom/switchbridge/cli.py` with a
 `register(subparsers)` function; it is loaded automatically.
 
+### For everyone: calling a model from your own agent code (model-agnostic)
+
+```python
+from carbonroom import llm
+
+text, used = llm.chat([{"role": "user", "content": "Summarize GAP-012 for Lena"}], task="report")
+data, used = llm.chat_json(messages, task="check")   # JSON reply, fences/<think> stripped
+```
+
+The model comes from settings, not code: `LLM_PROVIDER` + `LLM_MODEL`, or per task `LLM_MODEL_REPORT`,
+`LLM_PROVIDER_CHECK`, ... Presets: nvidia, anthropic, openai, openrouter, ollama (local, no key), openai_compatible
+(any server via `LLM_BASE_URL`). Other SDKs: `llm.register_provider(name, client_factory=...)`. Details:
+`docs/features/llm.md`.
+
 ### Open questions for the team
 
 1. Approve the additive schema columns in `contracts/CHANGES.md`.
