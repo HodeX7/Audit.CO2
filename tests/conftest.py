@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -16,6 +17,7 @@ def _ignore_developer_dotenv():
     from carbonroom import config
 
     config._ENV_LOADED = True
+    os.environ["CR_GRAPH"] = "off"  # no Neo4j in tests unless a test opts in with a fake store
 
 
 @pytest.fixture

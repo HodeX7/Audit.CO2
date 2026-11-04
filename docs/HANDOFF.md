@@ -148,6 +148,19 @@ The ledger is also a graph (live SQL views `ledger_nodes` / `ledger_edges`; `car
 - **Akshar:** `carbonroom ledger graph --period 2026-10 [--site austin] --out graph.md` draws a Mermaid graph for
   the README and video. Details: `docs/features/knowledge-graph.md`.
 
+**The same graph in a graph database (Neo4j).** Start it once with
+`docker compose -f infra/neo4j/docker-compose.yml up -d` (browser http://localhost:7474, user `neo4j`, password
+`carbonroom-local`). From then on it updates by itself: **any** `carbonroom` command that writes to the ledger,
+including your own plugin commands, re-syncs it. Nothing to change in your code, and if Neo4j isn't running
+nothing breaks. If your code writes through `db.py` outside the CLI, call
+`carbonroom.graphdb.store.sync_if_enabled(conn)` at the end.
+
+- **Agents (Akshar):** `carbonroom graphdb why <site> <period> --json` answers "why didn't you consider X?" with a
+  ready `summary` sentence. Also `graphdb conflicts`, `graphdb gaps` (open gaps per owner), `graphdb find "<text>"`,
+  and read-only Cypher via `graphdb query`. For the video: the Cypher snippets in `docs/features/knowledge-graph.md`
+  in Neo4j Browser.
+- **Richa:** `graphdb conflicts` and `graphdb gaps` cross-check your checker; the ledger stays the source of truth.
+
 ### For everyone: calling a model from your own agent code (model-agnostic)
 
 ```python

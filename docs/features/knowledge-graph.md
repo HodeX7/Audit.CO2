@@ -1,6 +1,7 @@
-# Knowledge graph (ledger as a graph)
+# Knowledge graph (ledger as a graph, mirrored into Neo4j)
 
-**Owner:** Ujjwal · **Code:** views in `contracts/schema.sql`, `carbonroom/ledger/graph.py` · **Tests:** `tests/test_graph.py`
+**Owner:** Ujjwal · **Code:** views in `contracts/schema.sql`, `carbonroom/ledger/graph.py`, `carbonroom/graphdb/` ·
+**Infra:** `infra/neo4j/docker-compose.yml` · **Tests:** `tests/test_graph.py`, `tests/test_graphdb.py`
 
 ## Why
 
@@ -9,9 +10,10 @@ approver, and "where did this come from?" is one click away. An auditor picks a 
 the bill. The checker asks "this bill was replaced: which numbers depend on it?" Humans in chat ask a
 specialist agent "why is this number what it is?" Those are graph questions.
 
-The ledger is SQLite, a relational database. A knowledge graph is a way of modelling data (things plus
-typed links between them), not a database product, so we model the ledger as a graph inside SQLite.
-Nothing extra to install, and the demo still reproduces from a clone.
+Two layers, one graph model. The graph is defined once, as views over the SQLite ledger, so it works from a
+clone with nothing to install and can never disagree with the ledger. It's then mirrored into a graph database,
+Neo4j, for Cypher queries by agents, the visual browser in the demo, and graph-native questions (see "Graph
+database (Neo4j)" below).
 
 ## Design
 
@@ -140,17 +142,68 @@ flowchart LR
 
 The three examples above are regenerated and compared by `tests/test_docs.py`, so they always match the code.
 
-### When a graph database would be worth it
+### Graph database (Neo4j)
 
-A separate graph database (e.g. Neo4j) pays off for unpredictable query shapes, unbounded depth, links invented
-at runtime, or graph algorithms. A month-end close has none of these: its questions are short, fixed-shape walks.
-A graph server would also break "clone and run." Everything goes through `carbonroom/ledger/`, so the same
-edges could be mirrored into a graph database later without changing teammates' code.
+The same graph is mirrored into **Neo4j**, a graph database: same node types, same links (names upper-cased:
+`EVIDENCED_BY`, `REPLACES`, `SUPERSEDED_BY`, `ABOUT`, `OWNED_BY`, …), same ids. It adds what SQLite can't:
+Cypher for agents, the visual browser for the demo video, and graph-native questions. SQLite stays the system of
+record (honesty triggers, append-only), and the views stay the one definition of the graph.
+
+```mermaid
+flowchart LR
+  W["any CLI command that writes (ours or a teammate's plugin)"] --> L[(SQLite ledger: system of record)]
+  L --> V["ledger_nodes / ledger_edges views: THE graph model"]
+  V --> T["ledger trace / impact / graph (offline)"]
+  V -->|"auto-sync when the event log grew"| N[(Neo4j: graph database)]
+  N --> Q["graphdb why / conflicts / gaps / find / query"]
+  N --> B["Neo4j Browser :7474 for the demo"]
+```
+
+- **Projection** (`carbonroom.graphdb.store.projection`): every row of `ledger_nodes` becomes a node, with label
+  `Site`, `Period`, `Document`, `Activity`, `Instrument`, `Gap`, `Calculation`, `Factor`, `Expected`, `Approval`,
+  `Person`, `Room` or `Run`, plus the extra label `CR`. Its useful details become properties (quantity as a decimal
+  string, excerpt, locator, delivery ticket, PUE, doc number, gap detail, REC region and vintage…). Every row of
+  `ledger_edges` becomes a relationship (`detail`, such as the locator, rides on it). A link whose end doesn't exist,
+  like an upload that names a gap id never opened, is skipped and counted.
+- **Sync** (`carbonroom.graphdb.store.sync`): uniqueness constraints, then **one write transaction** that removes
+  the `CR` nodes and recreates the graph with `UNWIND … MERGE`. Readers never see half a graph, nothing outside `CR`
+  is touched, labels come from a fixed map, link types are checked against `[A-Z_]+`, and every value travels as a
+  query parameter. The ledger never deletes; only this disposable copy is rebuilt (well under a second at this scale).
+- **When:** after any `carbonroom` command whose run grew the ledger's event log, including teammates' plugin
+  commands, with no change on their side; at the end of `collect_node`; or on demand. `CR_GRAPH=auto` (default) syncs
+  when Neo4j answers a 0.4 s TCP check and is silent otherwise; `on` warns; `off` never syncs. A failed sync prints a
+  warning and never fails the command.
+
+| Question | Function | Command |
+| --- | --- | --- |
+| Why wasn't X considered? What's recorded, open or still missing for a site and month, in one sentence | `carbonroom.graphdb.queries.why` | `carbonroom graphdb why reno 2026-10` |
+| Which fuel deliveries have two different quantities? | `carbonroom.graphdb.queries.conflicts` | `carbonroom graphdb conflicts --period 2026-10` |
+| Who owns which open gaps? | `carbonroom.graphdb.queries.gaps_by_owner` | `carbonroom graphdb gaps` |
+| Find by id, name, doc number, file name, excerpt, gap detail | `carbonroom.graphdb.queries.find` | `carbonroom graphdb find "data center"` |
+| Anything else, for agents (writes refused, READ routing) | `carbonroom.graphdb.queries.read_only` | `carbonroom graphdb query "MATCH …"` |
+
+Example `why` answer an agent can post: "No document for Reno Office 2026-10 has reached the ledger. Open gaps:
+GAP-012 missing_doc: … Still missing: electricity (owner @lena)."
+
+**Verification:** these Cypher queries need a live server, so `carbonroom graphdb selftest` syncs the current
+ledger and runs every one. It checks node, link and number-to-bill counts against the views, a why for every site
+and month, the conflicts the ledger implies, and the read-only guard. Built and unit-tested 2026-11-04 without a
+live Neo4j (the build environment couldn't pull the image). **Run `carbonroom graphdb selftest` once with Docker and
+record the result in `docs/STATUS.md`.**
+
+In Neo4j Browser (http://localhost:7474), for the demo:
+
+```cypher
+MATCH p = (:Activity)-[:EVIDENCED_BY]->(:Document)-[:RECEIVED_FROM]->(:Person) RETURN p
+MATCH p = (:Activity)-[:REPLACES]->(:Activity)-[:EVIDENCED_BY]->(:Document)-[:SUPERSEDED_BY]->(:Document) RETURN p
+MATCH p = (g:Gap)-[:ABOUT|OWNED_BY|ABOUT_SITE]->() RETURN p
+```
 
 ## Decisions
 
 See `docs/DECISIONS.md`: graph as SQL views (no duplicate storage, never stale); recursive-CTE traversal with hub
-stopping; gap `refs_json` keys as the way to link gaps to rows; `graph_version` for view changes; no graph server.
+stopping; gap `refs_json` keys as the way to link gaps to rows; `graph_version` for view changes; Neo4j as a mirrored
+graph database (one model, rebuilt per sync in one transaction, auto-synced after writes).
 
 ## Code map
 
@@ -167,6 +220,11 @@ stopping; gap `refs_json` keys as the way to link gaps to rows; `graph_version` 
 | `carbonroom.ledger.graph.to_mermaid` | Mermaid flowchart |
 | `carbonroom.ledger.graph.to_json` | `cr.graph.v1` JSON (nodes + edges) |
 | `carbonroom.ledger.graph.tree_lines` | indented text view of a walk |
+| `carbonroom.graphdb.store.projection` | the views as Neo4j nodes + relationships (pure) |
+| `carbonroom.graphdb.store.sync` | rebuild the Neo4j copy in one transaction |
+| `carbonroom.graphdb.store.sync_if_enabled` | the post-write hook; never fails the caller |
+| `carbonroom.graphdb.store.status` | reachable? last sync? in sync with the ledger? counts |
+| `carbonroom.graphdb.queries.selftest` | every Cypher query against the live server |
 
 ## Tests
 
@@ -176,6 +234,11 @@ number through a corrected bill, a calculation and a gap, and of a CO2e number; 
 a replaced bill (activities, calculation, gap); walks don't leak through hubs; gap refs, gap resolution, uploads
 answering a gap and batch runs become edges; month and per-site graphs with consistent Mermaid/JSON; views rebuilt
 when `graph_version` changes; the CLI commands. `tests/test_docs.py` regenerates the examples on this page.
+`tests/test_graphdb.py`: the Neo4j projection is exactly the views (every node, every link or a counted skip, only
+link shapes the views produce); details and Neo4j-safe values; a sync is one transaction touching only `CR` nodes,
+with values as parameters; READ routing; `CR_GRAPH` auto/on/off; a failed sync never breaks the caller; the CLI syncs
+after writing commands only; `collect_node` reports the sync; every Cypher query is well-formed, read-only and uses
+only link names the views produce; the read-only guard; `why` wording; commands explain how to start Neo4j.
 
 ## Commands
 
@@ -184,6 +247,16 @@ when `graph_version` changes; the CLI commands. `tests/test_docs.py` regenerates
 | `carbonroom ledger trace REF` | `--depth` (default 6) for non-number nodes, `--json` |
 | `carbonroom ledger impact REF` | `--depth` (default 4), `--json` |
 | `carbonroom ledger graph` | `--period` (required), `--site`, `--format mermaid\|json`, `--depth` (default 3), `--out FILE` (`.md` gets a mermaid fence) |
+| `carbonroom graphdb status` | `--json` |
+| `carbonroom graphdb sync` | `--json` |
+| `carbonroom graphdb why SITE PERIOD` | `--json` (includes the one-sentence `summary`) |
+| `carbonroom graphdb conflicts` | `--period`, `--json` |
+| `carbonroom graphdb gaps` | `--json` |
+| `carbonroom graphdb find TEXT` | `--limit` (default 25), `--json` |
+| `carbonroom graphdb query CYPHER` | `--param key=value` (repeatable); always prints JSON |
+| `carbonroom graphdb selftest` | (none) |
+
+Settings (`.env.example`): `CR_GRAPH`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`.
 
 ## How to use
 
@@ -192,4 +265,10 @@ uv run carbonroom ledger trace ACT-0739d5932d          # where did this number c
 uv run carbonroom ledger trace ELB-AUS-2610            # what does this bill connect to?
 uv run carbonroom ledger impact ELB-AUS-2610           # if this bill is wrong, what changes?
 uv run carbonroom ledger graph --period 2026-10 --site austin --out austin-october.md
+
+docker compose -f infra/neo4j/docker-compose.yml up -d  # Neo4j at http://localhost:7474 (neo4j / carbonroom-local)
+uv run carbonroom seed                                  # the graph database syncs automatically
+uv run carbonroom graphdb selftest                      # every Cypher query against the live server
+uv run carbonroom graphdb why reno 2026-10
+uv run carbonroom graphdb conflicts --period 2026-10
 ```

@@ -1,0 +1,18 @@
+# Neo4j Community for Carbon Room's knowledge graph. Local development and demo only.
+#   docker compose -f infra/neo4j/docker-compose.yml up -d
+#   browser: http://localhost:7474   (user neo4j, password below)   bolt: bolt://localhost:7687
+# The password is a local-only default that matches .env.example; change both for anything shared.
+services:
+  neo4j:
+    image: neo4j:2026.07.1
+    container_name: carbonroom-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/carbonroom-local
+      NEO4J_server_memory_heap_max__size: 1G
+    volumes:
+      - carbonroom-neo4j-data:/data
+volumes:
+  carbonroom-neo4j-data:

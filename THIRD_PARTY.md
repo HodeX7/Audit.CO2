@@ -14,6 +14,8 @@ Each owner adds their own rows. Last checked: 2026-11-03.
 | reportlab | generating the fictional seed PDFs | BSD |
 | openai (Python SDK) | OpenAI-compatible client for NVIDIA (and optional Anthropic) | Apache-2.0 |
 | python-dotenv | reading `.env` | BSD-3-Clause |
+| neo4j (Python driver) | knowledge graph sync and queries | Apache-2.0 (with PSF-2.0 parts) |
+| pytz (via neo4j) | time zones | MIT |
 | pytest (dev only) | tests | MIT |
 | hatchling (build only) | packaging | MIT |
 
@@ -25,6 +27,7 @@ Exact versions are pinned in `uv.lock`.
 | --- | --- | --- |
 | NVIDIA API catalog, build.nvidia.com (default provider) | an LLM *proposes* extracted fields; code verifies every value against the document | Free trial access is for prototyping, research, development and testing ([NIM FAQ](https://forums.developer.nvidia.com/t/nvidia-nim-faq/300317)); production use needs NVIDIA AI Enterprise. Governing terms: [NVIDIA Technology Access Terms of Use](https://developer.nvidia.com/legal/terms) - trial use is for evaluation, and no controlled or sensitive data may be submitted. We send only our fictional seed documents. |
 | Extraction model `nvidia/nemotron-3-ultra-550b-a55b` on NVIDIA (chosen by `carbonroom llm bench`, 2026-11-03; Llama 3.3 70B was retired, HTTP 410) | extraction proposals | [OpenMDW License Agreement 1.1](https://github.com/OpenMDW/OpenMDW/blob/main/1.1/LICENSE.OpenMDW-1.1), per the model's [NGC governing terms](https://catalog.ngc.nvidia.com/orgs/nim/nvidia/models/nemotron-3-ultra-550b-a55b/-/governing-terms). We only call the hosted API; no weights are redistributed. |
+| Neo4j Community Edition, Docker image `neo4j:2026.07.1` (`infra/neo4j/docker-compose.yml`) | knowledge graph database, local only | GPLv3. Run as a separate container that each user pulls themselves; we don't copy, modify or redistribute it, and our MIT code talks to it over the network through the Apache-2.0 driver. |
 | Anthropic API (optional) | same proposals via the OpenAI SDK compatibility layer | [Anthropic docs](https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk); the page notes the layer is meant for testing and comparing models. |
 
 ## Data

@@ -592,6 +592,172 @@ def cmd_llm_bench(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# graphdb (the knowledge graph in Neo4j; see docs/features/knowledge-graph.md)
+# ---------------------------------------------------------------------------
+
+
+def _graphdb_store():
+    from carbonroom.graphdb import store
+
+    if not store.reachable():
+        print(f"Neo4j isn't reachable at {store.settings()['uri']}. Start it with:\n"
+              "  docker compose -f infra/neo4j/docker-compose.yml up -d", file=sys.stderr)
+        return None
+    return store.Neo4jStore()
+
+
+def _with_graphdb(fn):
+    neo = _graphdb_store()
+    if neo is None:
+        return None, 2
+    try:
+        return fn(neo), 0
+    finally:
+        neo.close()
+
+
+def _emit(args, data, text_fn) -> int:
+    if getattr(args, "json", False):
+        _print_json(data)
+    else:
+        text_fn(data)
+    return 0
+
+
+def cmd_graphdb_status(args) -> int:
+    from carbonroom.graphdb import store
+
+    conn = _connect(args)
+    st = store.status(conn)
+    conn.close()
+
+    def text(s):
+        print(f"mode={s['mode']} uri={s['uri']} reachable={s['reachable']}")
+        if s.get("error"):
+            print(f"error: {s['error']}")
+        if s.get("synced_at"):
+            state = "in sync" if s["in_sync"] else f"behind (ledger event {s['ledger_event_id']}, graph {s['event_id']})"
+            print(f"last sync {s['synced_at']}: {s['nodes']} nodes, {s['relationships']} links, {state}")
+            print("  " + ", ".join(f"{k}: {v}" for k, v in s.get("counts", {}).items()))
+        elif s["reachable"]:
+            print("never synced: run `carbonroom graphdb sync`")
+
+    return _emit(args, st, text)
+
+
+def cmd_graphdb_sync(args) -> int:
+    from carbonroom.graphdb import store
+
+    neo = _graphdb_store()
+    if neo is None:
+        return 2
+    conn = _connect(args)
+    try:
+        result = store.sync(conn, neo)
+    finally:
+        conn.close()
+        neo.close()
+    return _emit(args, result, lambda r: print(
+        f"synced {r['nodes']} nodes and {r['relationships']} links (ledger event {r['event_id']}): "
+        + ", ".join(f"{k} {v}" for k, v in r["counts"].items())))
+
+
+def cmd_graphdb_why(args) -> int:
+    from carbonroom.graphdb import queries
+
+    data, code = _with_graphdb(lambda neo: queries.why(neo, args.site, args.period))
+    if code:
+        return code
+    if data is None:
+        print(f"unknown site {args.site} (or the graph isn't synced yet)", file=sys.stderr)
+        return 1
+    return _emit(args, data, lambda d: print(d["summary"]))
+
+
+def cmd_graphdb_conflicts(args) -> int:
+    from carbonroom.graphdb import queries
+
+    data, code = _with_graphdb(lambda neo: queries.conflicts(neo, args.period))
+    if code:
+        return code
+
+    def text(rows):
+        for r in rows:
+            claims = " vs ".join(f"{c.get('doc_ref') or c['id']} {c['quantity']} {c['unit']}" for c in r["claims"])
+            print(f"{r['delivery']}: {claims}")
+        if not rows:
+            print("no conflicting deliveries")
+
+    return _emit(args, data, text)
+
+
+def cmd_graphdb_gaps(args) -> int:
+    from carbonroom.graphdb import queries
+
+    data, code = _with_graphdb(queries.gaps_by_owner)
+    if code:
+        return code
+
+    def text(rows):
+        for r in rows:
+            print(f"@{r['owner']}: " + "; ".join(f"{g['id']} {g['kind']}" for g in r["gaps"]))
+        if not rows:
+            print("no open gaps")
+
+    return _emit(args, data, text)
+
+
+def cmd_graphdb_find(args) -> int:
+    from carbonroom.graphdb import queries
+
+    data, code = _with_graphdb(lambda neo: queries.find(neo, args.text, args.limit))
+    if code:
+        return code
+
+    def text(rows):
+        for r in rows:
+            print(f"{r['label']:<12}{r['id']:<22}{r['summary'] or ''}")
+        if not rows:
+            print("nothing found")
+
+    return _emit(args, data, text)
+
+
+def cmd_graphdb_query(args) -> int:
+    from carbonroom.graphdb import queries
+
+    params = dict(item.partition("=")[::2] for item in args.param or [])
+    try:
+        data, code = _with_graphdb(lambda neo: queries.read_only(neo, args.cypher, params))
+    except queries.QueryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if code:
+        return code
+    _print_json(data)
+    return 0
+
+
+def cmd_graphdb_selftest(args) -> int:
+    from carbonroom.graphdb import queries
+
+    neo = _graphdb_store()
+    if neo is None:
+        return 2
+    conn = _connect(args)
+    try:
+        rows = queries.selftest(conn, neo)
+    finally:
+        conn.close()
+        neo.close()
+    for name, ok, detail in rows:
+        print(f"{'OK  ' if ok else 'FAIL'} {name}" + (f": {detail}" if detail else ""))
+    failed = sum(1 for _, ok, _ in rows if not ok)
+    print(f"{len(rows) - failed}/{len(rows)} passed")
+    return 1 if failed else 0
+
+
+# ---------------------------------------------------------------------------
 # parser
 # ---------------------------------------------------------------------------
 
@@ -718,6 +884,38 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--verbose", "-v", action="store_true")
     p.set_defaults(func=cmd_llm_bench)
 
+    gdb = sub.add_parser("graphdb", help="the knowledge graph in Neo4j (graph database)").add_subparsers(
+        dest="graphdb_cmd", required=True)
+    p = gdb.add_parser("status", help="is Neo4j up, when was the last sync, is it current")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_graphdb_status)
+    p = gdb.add_parser("sync", help="copy the ledger's graph into Neo4j now")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_graphdb_sync)
+    p = gdb.add_parser("why", help="what was recorded, is open or is missing for a site and month, as one sentence")
+    p.add_argument("site")
+    p.add_argument("period")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_graphdb_why)
+    p = gdb.add_parser("conflicts", help="fuel deliveries with two different quantities")
+    p.add_argument("--period")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_graphdb_conflicts)
+    p = gdb.add_parser("gaps", help="open gaps grouped by owner")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_graphdb_gaps)
+    p = gdb.add_parser("find", help="search ids, names, doc numbers, file names, excerpts, gap details")
+    p.add_argument("text")
+    p.add_argument("--limit", type=int, default=25)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_graphdb_find)
+    p = gdb.add_parser("query", help="run read-only Cypher (for agents); prints JSON")
+    p.add_argument("cypher")
+    p.add_argument("--param", action="append", help="key=value, repeatable")
+    p.set_defaults(func=cmd_graphdb_query)
+    p = gdb.add_parser("selftest", help="sync, then run every query against the live Neo4j")
+    p.set_defaults(func=cmd_graphdb_selftest)
+
     for module_name in PLUGIN_MODULES:
         try:
             module = importlib.import_module(module_name)
@@ -731,6 +929,45 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _ledger_event_id(args) -> int | None:
+    from carbonroom.graphdb import store
+
+    if store.mode() == "off":
+        return None
+    path = Path(args.db) if args.db else config.db_path()
+    if not path.exists():
+        return 0
+    from carbonroom.ledger import db
+
+    try:
+        conn = db.connect(path, create=False)
+    except Exception:  # noqa: BLE001 - not a ledger (yet)
+        return None
+    try:
+        return int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0])
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        conn.close()
+
+
+def _auto_sync_graphdb(args, before: int | None) -> None:
+    """After ANY command (ours or a teammate's plugin) that wrote to the ledger, refresh the graph database."""
+    if before is None:
+        return
+    after = _ledger_event_id(args)
+    if after is None or after == before:
+        return
+    from carbonroom.graphdb import store
+    from carbonroom.ledger import db
+
+    conn = db.connect(Path(args.db) if args.db else config.db_path(), create=False)
+    try:
+        store.sync_if_enabled(conn)
+    finally:
+        conn.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     config.load_env()
     parser = build_parser()
@@ -738,7 +975,11 @@ def main(argv: list[str] | None = None) -> int:
     from carbonroom.ledger.db import LedgerError
 
     try:
-        return int(args.func(args) or 0)
+        before = _ledger_event_id(args)
+        code = int(args.func(args) or 0)
+        if args.command != "graphdb":
+            _auto_sync_graphdb(args, before)
+        return code
     except LedgerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

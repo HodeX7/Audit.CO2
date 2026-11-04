@@ -228,6 +228,9 @@ def collect_node(state: dict[str, Any]) -> dict[str, Any]:
             periods=state.get("periods"),
             proposer=state.get("proposer"),
         )
+        from carbonroom.graphdb import store as graph_store
+
+        summary["graph_synced"] = graph_store.sync_if_enabled(conn, quiet=True) is not None
     finally:
         conn.close()
     summary.pop("results", None)

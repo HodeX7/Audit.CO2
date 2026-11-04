@@ -22,8 +22,8 @@ FEATURES = REPO / "docs" / "features"
 FEATURE_DOCS = sorted(FEATURES.glob("*.md"))
 HANDOFF = REPO / "docs" / "HANDOFF.md"
 OWN_DOCS = FEATURE_DOCS + [HANDOFF, REPO / "docs" / "EXPLAIN_ingestion.md", REPO / "data" / "seed" / "README.md"]
-OWN_COMMANDS = {"init", "seed", "ingest", "extract", "ledger", "llm"}  # teammates register their own
-ENV_PREFIXES = ("CR_", "LLM_", "NVIDIA_", "ANTHROPIC_", "OPENAI_", "OPENROUTER_", "OLLAMA_")
+OWN_COMMANDS = {"init", "seed", "ingest", "extract", "ledger", "llm", "graphdb"}  # teammates register their own
+ENV_PREFIXES = ("CR_", "LLM_", "NVIDIA_", "ANTHROPIC_", "OPENAI_", "OPENROUTER_", "OLLAMA_", "NEO4J_")
 
 
 def read(path: Path) -> str:

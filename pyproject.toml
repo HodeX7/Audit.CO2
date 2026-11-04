@@ -9,6 +9,7 @@ dependencies = [
     "reportlab>=4.2",
     "openai>=1.40",
     "python-dotenv>=1.0",
+    "neo4j>=5.20,<7",
 ]
 
 [project.scripts]
