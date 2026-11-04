@@ -1,0 +1,32 @@
+# Contract changes
+
+Shared contracts change only with team agreement. Each entry: what, why, who, status.
+
+## 2026-11-03 - schema.sql v1 (Ujjwal) - PROPOSED, needs Richa + Akshar approval
+
+`contracts/schema.sql` implements every table and column in Section 5.3 exactly. These are
+**additive** (no contract column was renamed or removed):
+
+| Table | Added | Why |
+| --- | --- | --- |
+| all | `CHECK` constraints on status/kind/scope enums; a trigger on every table that aborts `DELETE` | Honesty rule 3 enforced by the database, not by goodwill |
+| `sites` | `kind` (`facility`/`cloud`), `aliases_json` | Nimbus Cloud is a "site" row so gaps route to Dev in `cr-cloud`; aliases let code match a site named in a document |
+| `source_docs` | `original_name`, `doc_ref`, `page_count`, `meta_json` | `doc_ref` (e.g. INV-204) links corrected bills; `meta_json` keeps the chat thread/message/gap ids of an upload |
+| `activities` | `status_reason`, `created_at`; status adds nothing new (`SUPERSEDED` was already in 5.3's rules) | Why a status changed is shown in chat |
+| `instruments` | `site_id`, `certificate_id`, `excerpt`, `excerpt_locator`, `excerpt_sha256`, `status`, `superseded_by`, `extra_json`, `created_by`, `updated_at` | A REC is evidence too: same proof (excerpt + hash) and same supersede rule as activities |
+| `gaps` | `created_at`, `created_by`, `dedupe_key` (UNIQUE), `refs_json` | The same problem is never opened twice; gaps point at the rows/docs they are about |
+| `events` | `detail_json` | Structured audit details |
+| new `expected_documents` | `site_id`, `category`, `doc_kind`, `frequency` (`monthly`/`as_delivered`) | Lets the checker detect the missing Reno bill without guessing |
+| new `schema_meta` | `schema_version` | Migrations |
+
+Conventions written into the schema header:
+- Quantities, factors and results are **decimal strings** (TEXT). Read them with `Decimal(...)`, never `float`.
+- Timestamps are ISO-8601 UTC; periods are `YYYY-MM`.
+- Guards: evidence columns are immutable; `events`, `approvals`, `calculations` are append-only; a gap
+  can't be closed without `resolved_by` + `resolution`; a period can't be `CLOSED` without a recorded
+  `APPROVE` by the same handle.
+
+## Noted for Akshar (chat formats, 5.4)
+
+The gap example says "Please drop the **September** electricity bill" for a `2026-10` gap. It should say
+**October** (the missing Reno bill is October). No schema impact.

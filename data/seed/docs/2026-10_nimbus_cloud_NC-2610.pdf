@@ -1,0 +1,205 @@
+%PDF-1.4
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R /F2 3 0 R /F3 4 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
+>>
+endobj
+4 0 obj
+<<
+/BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding /Name /F3 /Subtype /Type1 /Type /Font
+>>
+endobj
+5 0 obj
+<<
+/Contents 10 0 R /MediaBox [ 0 0 612 792 ] /Parent 9 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+6 0 obj
+<<
+/Contents 11 0 R /MediaBox [ 0 0 612 792 ] /Parent 9 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+7 0 obj
+<<
+/PageMode /UseNone /Pages 9 0 R /Type /Catalog
+>>
+endobj
+8 0 obj
+<<
+/Author (Carbon Room seed generator \(fictional\)) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (FICTIONAL DOCUMENT) /Title (2026-10_nimbus_cloud_NC-2610) /Trapped /False
+>>
+endobj
+9 0 obj
+<<
+/Count 2 /Kids [ 5 0 R 6 0 R ] /Type /Pages
+>>
+endobj
+10 0 obj
+<<
+/Length 2348
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+.121569 .360784 .290196 rg
+n 0 774 612 18 re f*
+.121569 .360784 .290196 rg
+BT /F2 17 Tf 20.4 TL ET
+BT 1 0 0 1 54 728 Tm (Nimbus Cloud, Inc.) Tj T* ET
+.333333 .333333 .333333 rg
+BT /F1 9 Tf 10.8 TL ET
+BT 1 0 0 1 54 710 Tm (500 Stratus Avenue, Ashgrove, VA \(fictional provider\)) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F2 13 Tf 15.6 TL ET
+BT 1 0 0 1 54 684 Tm (CLOUD SERVICES INVOICE) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 660 Tm (Invoice number: NC-2610) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 644 Tm (Invoice date: November 2, 2026) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 628 Tm (Billing period: October 2026) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 612 Tm (Customer: Brightwell Manufacturing) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 596 Tm (Account: BW-NC-30114) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 580 Tm (Region: us-east-va \(Virginia\)) Tj T* ET
+.733333 .733333 .733333 RG
+.6 w
+n 54 570 m 558 570 l S
+.121569 .360784 .290196 rg
+BT /F2 11 Tf 13.2 TL ET
+BT 1 0 0 1 54 552 Tm (Charges) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 534 Tm (Compute instances \(reserved, 64 vCPU x 12\): $18,240.00) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 518 Tm (GPU inference hours \(1,450 h\): $5,075.00) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 502 Tm (Object storage \(82 TB-month\): $1,722.00) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 486 Tm (Total due: $25,037.00) Tj T* ET
+.733333 .733333 .733333 RG
+.6 w
+n 54 476 m 558 476 l S
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 458 Tm (See page 2 for the energy and water disclosure for this billing period.) Tj T* ET
+.603922 .203922 .070588 rg
+BT /F3 7.5 Tf 9 TL ET
+BT 1 0 0 1 54 46 Tm (FICTIONAL DOCUMENT - created for the Carbon Room hackathon demo. Brightwell Manufacturing and every name, address) Tj T* ET
+BT 1 0 0 1 54 36 Tm (and number here are invented. Not a real bill.) Tj T* ET
+.333333 .333333 .333333 rg
+BT /F1 8 Tf 9.6 TL ET
+BT 1 0 0 1 517.08 24 Tm (Page 1 of 2) Tj T* ET
+ 
+endstream
+endobj
+11 0 obj
+<<
+/Length 1800
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+.121569 .360784 .290196 rg
+n 0 774 612 18 re f*
+.121569 .360784 .290196 rg
+BT /F2 17 Tf 20.4 TL ET
+BT 1 0 0 1 54 728 Tm (Nimbus Cloud, Inc.) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F2 13 Tf 15.6 TL ET
+BT 1 0 0 1 54 710 Tm (ENERGY AND WATER DISCLOSURE) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 686 Tm (Invoice number: NC-2610) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 670 Tm (Billing period: October 2026) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 654 Tm (Region: us-east-va \(Virginia\)) Tj T* ET
+.733333 .733333 .733333 RG
+.6 w
+n 54 644 m 558 644 l S
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 626 Tm (IT equipment energy attributed to this account: 38,200 kWh) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 610 Tm (Power usage effectiveness \(PUE\), facility average: 1.35) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 594 Tm (Water usage effectiveness \(WUE\): 0.42 L/kWh) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 578 Tm (Method: metered rack power for dedicated hosts; shared hosts allocated by vCPU-hours.) Tj T* ET
+.066667 .066667 .066667 rg
+BT /F1 10.5 Tf 12.6 TL ET
+BT 1 0 0 1 54 562 Tm (Facility energy = IT energy x PUE. Water = IT energy x WUE.) Tj T* ET
+.603922 .203922 .070588 rg
+BT /F3 7.5 Tf 9 TL ET
+BT 1 0 0 1 54 46 Tm (FICTIONAL DOCUMENT - created for the Carbon Room hackathon demo. Brightwell Manufacturing and every name, address) Tj T* ET
+BT 1 0 0 1 54 36 Tm (and number here are invented. Not a real bill.) Tj T* ET
+.333333 .333333 .333333 rg
+BT /F1 8 Tf 9.6 TL ET
+BT 1 0 0 1 517.08 24 Tm (Page 2 of 2) Tj T* ET
+ 
+endstream
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000061 00000 n 
+0000000112 00000 n 
+0000000219 00000 n 
+0000000331 00000 n 
+0000000446 00000 n 
+0000000640 00000 n 
+0000000834 00000 n 
+0000000902 00000 n 
+0000001221 00000 n 
+0000001286 00000 n 
+0000003686 00000 n 
+trailer
+<<
+/ID 
+[<7dadefb7156e3b2a4a361303ca425b33><7dadefb7156e3b2a4a361303ca425b33>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 8 0 R
+/Root 7 0 R
+/Size 12
+>>
+startxref
+5538
+%%EOF

@@ -1,0 +1,43 @@
+{
+  "schema": "cr.extraction-cache.v1",
+  "sha256": "a0ac18b171098a36318ace0ddec6853bf1a84fd00c6a4c21c6bc15add75007a1",
+  "file": "2026-10_austin_electricity_ELB-AUS-2610.pdf",
+  "proposer": "rules-v1",
+  "proposal": {
+    "schema": "cr.extraction.v1",
+    "doc_kind": "utility_bill",
+    "doc_ref": {
+      "value": "ELB-AUS-2610",
+      "excerpt": "Bill number: ELB-AUS-2610",
+      "page": 1
+    },
+    "replaces_ref": null,
+    "site": {
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
+      "excerpt": "Service location: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
+      "page": 1
+    },
+    "period": {
+      "value": "2026-10",
+      "excerpt": "Service period: October 1, 2026 - October 31, 2026",
+      "page": 1
+    },
+    "claims": [
+      {
+        "category": "electricity",
+        "quantity": "191,300",
+        "unit": "kWh",
+        "excerpt": "Total energy used this period: 191,300 kWh",
+        "page": 1,
+        "fields": {
+          "meter_id": {
+            "value": "CMPL-M-77120",
+            "excerpt": "Meter: CMPL-M-77120",
+            "page": 1
+          }
+        }
+      }
+    ],
+    "instruments": []
+  }
+}

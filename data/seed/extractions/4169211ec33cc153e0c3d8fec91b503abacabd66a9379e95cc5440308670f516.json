@@ -1,0 +1,48 @@
+{
+  "schema": "cr.extraction-cache.v1",
+  "sha256": "4169211ec33cc153e0c3d8fec91b503abacabd66a9379e95cc5440308670f516",
+  "file": "2026-10_austin_diesel_INV-204.pdf",
+  "proposer": "rules-v1",
+  "proposal": {
+    "schema": "cr.extraction.v1",
+    "doc_kind": "fuel_invoice",
+    "doc_ref": {
+      "value": "INV-204",
+      "excerpt": "Invoice number: INV-204",
+      "page": 1
+    },
+    "replaces_ref": null,
+    "site": {
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address) - backup generator tank",
+      "excerpt": "Deliver to: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address) - backup generator tank",
+      "page": 1
+    },
+    "period": {
+      "value": "2026-10",
+      "excerpt": "Delivery date: October 14, 2026",
+      "page": 1
+    },
+    "claims": [
+      {
+        "category": "diesel",
+        "quantity": "500.0",
+        "unit": "gal",
+        "excerpt": "Quantity delivered: 500.0 gal",
+        "page": 1,
+        "fields": {
+          "delivery_ref": {
+            "value": "DLV-7731",
+            "excerpt": "Delivery ticket: DLV-7731",
+            "page": 1
+          },
+          "delivery_date": {
+            "value": "October 14, 2026",
+            "excerpt": "Delivery date: October 14, 2026",
+            "page": 1
+          }
+        }
+      }
+    ],
+    "instruments": []
+  }
+}
