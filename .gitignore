@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Secrets - never commit
+.env
+
+# Runtime ledger and uploads (rebuilt with `carbonroom seed`)
+carbonroom.db
+carbonroom.db-wal
+carbonroom.db-shm
+*.db
+data/store/
+data/inbox/*
+!data/inbox/.gitkeep
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
