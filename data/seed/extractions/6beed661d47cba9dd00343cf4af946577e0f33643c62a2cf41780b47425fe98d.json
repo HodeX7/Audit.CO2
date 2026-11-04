@@ -2,7 +2,7 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "6beed661d47cba9dd00343cf4af946577e0f33643c62a2cf41780b47425fe98d",
   "file": "2026-10_austin_diesel_INV-204B.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
     "doc_kind": "fuel_invoice",

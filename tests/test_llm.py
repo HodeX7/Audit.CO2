@@ -43,6 +43,7 @@ def fake_llm(monkeypatch):
             raise state["error"]
         return json.loads(json.dumps(state["reply"])), llm.Provider("nvidia", "http://fake", "k", model or "fake/model")
 
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-fake")
     monkeypatch.setattr(llm, "is_configured", lambda: True)
     monkeypatch.setattr(llm, "chat_json", chat_json)
     return SimpleNamespace(calls=calls, state=state)
@@ -160,12 +161,13 @@ def _fake_client(failures=0):
 
 def test_chat_retries_429_using_retry_after(monkeypatch):
     monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    monkeypatch.setenv("LLM_MODEL", "test/model")
     monkeypatch.setattr(llm, "_LIMITER", llm.RateLimiter(1000, sleep=lambda s: None))
     client, completions = _fake_client(failures=2)
     slept = []
     data, provider = llm.chat_json([{"role": "user", "content": "hi"}], client=client, sleep=slept.append)
     assert data == {"ok": True} and slept == [2.0, 2.0] and len(completions.kwargs) == 3
-    assert completions.kwargs[0]["temperature"] == 0 and provider.model == "meta/llama-3.3-70b-instruct"
+    assert completions.kwargs[0]["temperature"] == 0 and provider.model == "test/model"
 
 
 def test_anthropic_provider_omits_temperature(monkeypatch):
@@ -193,3 +195,83 @@ def test_models_command_without_key(env, capsys):
 
     assert main(["llm", "models"]) == 2
     assert "NVIDIA_API_KEY" in capsys.readouterr().err
+
+
+def _status_error(status: int, detail: str) -> Exception:
+    exc = openai.APIStatusError.__new__(openai.APIStatusError)
+    Exception.__init__(exc, f"Error code: {status}")
+    exc.status_code, exc.body, exc.message = status, {"detail": detail}, f"Error code: {status}"
+    return exc
+
+
+class _FailingCompletions:
+    def __init__(self, exc):
+        self.exc = exc
+        self.calls = 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        raise self.exc
+
+
+def test_no_default_model_means_not_configured(env, monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    assert not llm.is_configured()  # auto mode then quietly uses the cache/rules
+    with pytest.raises(llm.LLMNotConfigured, match="llm probe"):
+        llm.provider()
+    assert llm.provider(need_model=False).model == ""  # listing models still works
+
+
+def test_retired_model_is_not_retried_and_says_why(monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    monkeypatch.setattr(llm, "_LIMITER", llm.RateLimiter(1000, sleep=lambda s: None))
+    completions = _FailingCompletions(_status_error(410, "Model meta/llama-3.3-70b-instruct is end-of-life"))
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    result = llm.probe("meta/llama-3.3-70b-instruct", client=client)
+    assert completions.calls == 1
+    assert result["ok"] is False and result["status"] == 410 and "end-of-life" in result["error"]
+
+
+def test_probe_reports_a_working_model(monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    monkeypatch.setattr(llm, "_LIMITER", llm.RateLimiter(1000, sleep=lambda s: None))
+    client, _ = _fake_client()
+    result = llm.probe("good/model", client=client)
+    assert result["ok"] and result["json_ok"]
+
+
+def test_chat_model_filter():
+    assert llm.looks_like_chat_model("nvidia/nemotron-3-ultra-550b-a55b")
+    assert llm.looks_like_chat_model("deepseek-ai/deepseek-v4.1-flash")
+    for not_chat in ("nvidia/nemotron-3-embed-1b", "nvidia/nemotron-3.5-content-safety", "nvidia/nemotron-parse-2.0",
+                     "nvidia/nemotron-4-340b-reward", "nvidia/llama-3.1-nemotron-safety-guard-8b-v3"):
+        assert not llm.looks_like_chat_model(not_chat), not_chat
+
+
+def test_bench_stops_early_on_an_unavailable_model(seeded, fake_llm, capsys):
+    from carbonroom.cli import main
+
+    fake_llm.state["error"] = llm.LLMError("nvidia API error 410 for old/model: end-of-life", status_code=410)
+    assert main(["llm", "bench", "--models", "old/model"]) == 0
+    assert len(fake_llm.calls) == 1
+    assert "unavailable (HTTP 410)" in capsys.readouterr().out
+
+
+def test_bench_skips_a_model_that_keeps_timing_out(seeded, fake_llm, capsys):
+    from carbonroom.cli import main
+
+    fake_llm.state["error"] = llm.LLMError("nvidia API failed after 2 attempts: Request timed out.")
+    assert main(["llm", "bench", "--models", "slow/model"]) == 0
+    assert len(fake_llm.calls) == 2
+    assert "unreliable (2 failures in a row)" in capsys.readouterr().out
+
+
+def test_attempts_and_timeout_come_from_env(monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test")
+    monkeypatch.setenv("LLM_MODEL", "test/model")
+    monkeypatch.setenv("CR_LLM_ATTEMPTS", "2")
+    monkeypatch.setattr(llm, "_LIMITER", llm.RateLimiter(1000, sleep=lambda s: None))
+    client, completions = _fake_client(failures=5)
+    with pytest.raises(llm.LLMError, match="after 2 attempts"):
+        llm.chat([{"role": "user", "content": "hi"}], client=client, sleep=lambda s: None)
+    assert len(completions.kwargs) == 2

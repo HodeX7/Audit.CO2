@@ -2,7 +2,7 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "64eb7ac2bcfc0a7180fde309566885ea81cadfc388f7431948c59b42ca9f8be9",
   "file": "2026-09_austin_gas_GAS-AUS-2609.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
     "doc_kind": "utility_bill",

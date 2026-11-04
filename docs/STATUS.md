@@ -10,18 +10,18 @@ Each owner updates their own section: done / next / blocked.
 - Collector (sha256 dedupe, inbox watch folder with sidecars, content-addressed evidence store)
 - Extraction with proof (cache / NVIDIA LLM / rules proposers; code verifies excerpt, number, unit, site, period)
 - Consolidator (UNVERIFIED rows, both sides of conflicts kept, supersede links for corrected bills, `unverified_claim` gaps)
-- CLI: `seed`, `ingest` (+ `--json`, `--watch`), `extract`, `ledger show|export|gaps|missing|events|verify`, `llm models|bench`
+- CLI: `seed`, `ingest` (+ `--json`, `--watch`), `extract`, `ledger show|export|gaps|missing|events|verify`, `llm models|probe|bench`
 - Tests: all passing (`uv run pytest`). Ingest is idempotent, and the seed is reproducible.
 - `docs/HANDOFF.md`, `docs/EXPLAIN_ingestion.md`, `docs/DECISIONS.md`, `THIRD_PARTY.md`
+- LLM: `nvidia/nemotron-3-ultra-550b-a55b`, bench 13/13 exact (backup `nvidia/nemotron-3.5-bolt-e4b`, also 13/13); seed extractions re-saved with it
 
 **Next**
-- With an NVIDIA key: `carbonroom llm models`, then `carbonroom llm bench --models meta/llama-3.3-70b-instruct,nvidia/nemotron-3-super-120b-a12b,deepseek-ai/deepseek-v3.1`; record the winner; optionally `carbonroom seed --refresh-cache --proposer llm` to replace the rules-generated cache
 - Open the PR `feat/ingest` → `main`, tagging Richa (db API) and Akshar (ingest hand-off)
 - Team sign-off on `contracts/CHANGES.md`
 - Stretch, only after everything else works: Drive/email connectors using fictional files only
 
 **Blocked**
-- Nothing. The NVIDIA key is a human step (build.nvidia.com → API Keys), and nothing needs it to run.
+- Push access: HodeX7/Audit.CO2 must add ujjwal0909 as a collaborator (403 on push).
 
 ## Richa (Calculation, Checker & Report)
 

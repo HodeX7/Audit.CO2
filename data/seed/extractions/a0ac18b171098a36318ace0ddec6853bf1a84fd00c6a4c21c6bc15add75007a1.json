@@ -2,7 +2,7 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "a0ac18b171098a36318ace0ddec6853bf1a84fd00c6a4c21c6bc15add75007a1",
   "file": "2026-10_austin_electricity_ELB-AUS-2610.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
     "doc_kind": "utility_bill",
@@ -13,7 +13,7 @@
     },
     "replaces_ref": null,
     "site": {
-      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX",
       "excerpt": "Service location: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
       "page": 1
     },

@@ -2,7 +2,7 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "d878ffa8069cf738d8cf877aea77d5f2248fb5c06fd1c367a0a94ada67e6468e",
   "file": "2026-10_rec_REC-WECC-2023-55120.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
     "doc_kind": "rec_certificate",

@@ -2,7 +2,7 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "4169211ec33cc153e0c3d8fec91b503abacabd66a9379e95cc5440308670f516",
   "file": "2026-10_austin_diesel_INV-204.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
     "doc_kind": "fuel_invoice",
@@ -13,7 +13,7 @@
     },
     "replaces_ref": null,
     "site": {
-      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address) - backup generator tank",
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX",
       "excerpt": "Deliver to: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address) - backup generator tank",
       "page": 1
     },

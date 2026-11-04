@@ -334,16 +334,61 @@ def cmd_ledger_verify(args) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _listed_models(llm, args) -> list[str]:
+    import re
+
+    ids = llm.list_models()
+    if getattr(args, "chat", True):
+        ids = [m for m in ids if llm.looks_like_chat_model(m)]
+    if args.grep:
+        ids = [m for m in ids if re.search(args.grep, m, re.IGNORECASE)]
+    return ids
+
+
 def cmd_llm_models(args) -> int:
     from carbonroom import llm
 
     try:
-        for model_id in llm.list_models():
+        for model_id in _listed_models(llm, args):
             print(model_id)
     except llm.LLMNotConfigured as exc:
         print(f"not configured: {exc}", file=sys.stderr)
         return 2
+    except llm.LLMError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     return 0
+
+
+def cmd_llm_probe(args) -> int:
+    """One tiny call per model: which listed models actually answer for this key?"""
+    from carbonroom import llm
+
+    try:
+        if args.models:
+            models = [m.strip() for m in args.models.split(",") if m.strip()]
+        else:
+            models = _listed_models(llm, args)[: args.limit]
+    except llm.LLMNotConfigured as exc:
+        print(f"not configured: {exc}", file=sys.stderr)
+        return 2
+    if not models:
+        print("no models matched", file=sys.stderr)
+        return 1
+    print(f"probing {len(models)} model(s), about {max(1, round(len(models) * 60 / 35 / 60))} min at the rate limit",
+          file=sys.stderr)
+    working = []
+    for model in models:
+        r = llm.probe(model)
+        if r["ok"]:
+            working.append(model)
+            note = "JSON ok" if r["json_ok"] else "answers, but not clean JSON"
+            print(f"OK    {model:<55}{r['seconds']:>6.1f}s  {note}", flush=True)
+        else:
+            print(f"FAIL  {model:<55}{r['seconds']:>6.1f}s  HTTP {r['status']}: {r['error'][-90:]}", flush=True)
+    print(f"\n{len(working)} working. Next: carbonroom llm bench --models {','.join(working[:4])}" if working
+          else "\nnone working")
+    return 0 if working else 1
 
 
 def cmd_llm_bench(args) -> int:
@@ -352,16 +397,22 @@ def cmd_llm_bench(args) -> int:
     from carbonroom.ingest import extract, rules
     from carbonroom.ingest.seed import manifest
 
-    if not llm.is_configured():
-        print("set NVIDIA_API_KEY (or LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY) first", file=sys.stderr)
+    try:
+        default_model = llm.provider(need_model=False).model
+    except llm.LLMNotConfigured as exc:
+        print(f"not configured: {exc}", file=sys.stderr)
+        return 2
+    models = [m.strip() for m in (args.models or "").split(",") if m.strip()] or ([default_model] if default_model else [])
+    if not models:
+        print("give --models a,b,c (find working ones with `carbonroom llm probe`)", file=sys.stderr)
         return 2
     conn = _connect(args)
     matcher = extract.site_matcher_for(conn)
-    models = [m.strip() for m in (args.models or "").split(",") if m.strip()] or [llm.provider().model]
     entries = manifest()
     rows = []
     for model in models:
-        score = {"model": model, "docs": 0, "exact": 0, "rejected": 0, "errors": 0, "seconds": 0.0}
+        score = {"model": model, "docs": 0, "exact": 0, "rejected": 0, "errors": 0, "seconds": 0.0, "note": ""}
+        failures_in_a_row = 0
         for entry in entries:
             path = config.seed_dir() / entry["path"]
             pages = extract.read_pages(path)
@@ -371,13 +422,21 @@ def cmd_llm_bench(args) -> int:
             score["docs"] += 1
             started = time.monotonic()
             try:
-                proposal, _ = extract.llm_propose(path.name, pages, model=model)
+                proposal, _ = extract.llm_propose(path.name, pages, model=model, attempts=2)
             except Exception as exc:  # noqa: BLE001 - report and continue
                 score["errors"] += 1
+                failures_in_a_row += 1
                 print(f"  {model} {path.name}: error {exc}", file=sys.stderr)
+                if getattr(exc, "status_code", None) in llm.UNAVAILABLE_STATUS:
+                    score["note"] = f"unavailable (HTTP {exc.status_code}); skipped the other documents"
+                    break
+                if failures_in_a_row >= 2:
+                    score["note"] = "unreliable (2 failures in a row); skipped the other documents"
+                    break
                 continue
             finally:
                 score["seconds"] += time.monotonic() - started
+            failures_in_a_row = 0
             got_ex = extract.verify(proposal, pages, matcher, model)
             got = sorted((c.category, str(c.normalized.quantity)) for c in got_ex.claims) + sorted(
                 ("REC", str(i.normalized.quantity)) for i in got_ex.instruments)
@@ -388,9 +447,11 @@ def cmd_llm_bench(args) -> int:
                 print(f"  {model} {path.name}: got {got} want {want} rejected={[f.reason for f in got_ex.failures]}")
         rows.append(score)
     conn.close()
-    print(f"{'MODEL':<45}{'EXACT':>8}{'REJECTED':>10}{'ERRORS':>8}{'SEC':>8}")
+    total = len(entries)
+    print(f"{'MODEL':<45}{'EXACT':>8}{'REJECTED':>10}{'ERRORS':>8}{'SEC':>8}  NOTE")
     for s in rows:
-        print(f"{s['model']:<45}{s['exact']:>4}/{s['docs']:<3}{s['rejected']:>10}{s['errors']:>8}{s['seconds']:>8.1f}")
+        print(f"{s['model']:<45}{s['exact']:>4}/{total:<3}{s['rejected']:>10}{s['errors']:>8}{s['seconds']:>8.1f}  "
+              f"{s['note']}")
     print("Record the winner in docs/DECISIONS.md and set LLM_MODEL in .env.")
     return 0
 
@@ -471,8 +532,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_ledger_verify)
 
     llm_p = sub.add_parser("llm", help="model provider tools").add_subparsers(dest="llm_cmd", required=True)
-    p = llm_p.add_parser("models", help="list models from the provider (GET /models)")
+    p = llm_p.add_parser("models", help="list chat models from the provider (GET /models)")
+    p.add_argument("--all", dest="chat", action="store_false", help="include embedding/safety/OCR models")
+    p.add_argument("--grep", help="regex filter, e.g. 'nemotron|deepseek|qwen'")
     p.set_defaults(func=cmd_llm_models)
+    p = llm_p.add_parser("probe", help="one tiny call per model: which ones answer for this key?")
+    p.add_argument("--models", help="comma-separated model ids (default: listed chat models)")
+    p.add_argument("--grep", default="nemotron|deepseek|llama|qwen|mistral|gpt-oss|kimi|glm|gemma|phi",
+                   help="regex filter on listed models")
+    p.add_argument("--all", dest="chat", action="store_false", help="include embedding/safety/OCR models")
+    p.add_argument("--limit", type=int, default=25)
+    p.set_defaults(func=cmd_llm_probe)
     p = llm_p.add_parser("bench", help="score candidate models on the seed documents")
     p.add_argument("--models", help="comma-separated model ids")
     p.add_argument("--verbose", "-v", action="store_true")

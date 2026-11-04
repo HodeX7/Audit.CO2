@@ -2,10 +2,10 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "979e61f2318448d07986cd13d1c8348fc9fa91f4ad32ad205fcfd73ab1988f13",
   "file": "2026-10_austin_gas_GAS-AUS-2610.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
-    "doc_kind": "utility_bill",
+    "doc_kind": "fuel_invoice",
     "doc_ref": {
       "value": "GAS-AUS-2610",
       "excerpt": "Bill number: GAS-AUS-2610",
@@ -13,7 +13,7 @@
     },
     "replaces_ref": null,
     "site": {
-      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX",
       "excerpt": "Service location: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
       "page": 1
     },

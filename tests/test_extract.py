@@ -142,3 +142,24 @@ def test_cloud_fields_are_verified_individually():
     assert "wue_l_per_kwh" in claim.fields and claim.fields["wue_l_per_kwh"].value == "0.42"
     assert claim.unverified_fields == ["pue"]  # ...but the transposed PUE is not
     assert any(f.scope == "field" and f.field == "pue" for f in ex.failures)
+
+
+def test_site_line_pointing_at_the_customer_falls_back_to_the_one_site_in_the_document():
+    p = good_proposal()
+    p["site"] = {"value": "Brightwell Manufacturing", "excerpt": "Cedar Mesa Power & Light", "page": 1}
+    ex = extract.verify(p, PAGES, matcher)
+    assert ex.site_id == "austin" and len(ex.claims) == 1 and ex.failures == []
+    assert ex.site_evidence.excerpt.startswith("Service location: Austin Plant")
+    assert ex.notes and "resolved by code" in ex.notes[0]
+
+
+def test_no_fallback_when_the_document_names_two_sites_or_the_proposal_disagrees():
+    pages = [PAGES[0] + "\nTransferred from: Reno Office"]
+    p = good_proposal()
+    p["site"] = {"value": "x", "excerpt": "Cedar Mesa Power & Light", "page": 1}
+    ex = extract.verify(p, pages, matcher)
+    assert ex.site_id is None and ex.claims == []
+    p = good_proposal()
+    p["site"]["value"] = "Reno Office"  # disagreement is never papered over
+    ex = extract.verify(p, PAGES, matcher)
+    assert ex.site_id is None and ex.claims == []

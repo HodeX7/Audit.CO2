@@ -24,7 +24,7 @@ Exact versions are pinned in `uv.lock`.
 | Service | Used for | Terms |
 | --- | --- | --- |
 | NVIDIA API catalog, build.nvidia.com (default provider) | an LLM *proposes* extracted fields; code verifies every value against the document | Free trial access is for prototyping, research, development and testing ([NIM FAQ](https://forums.developer.nvidia.com/t/nvidia-nim-faq/300317)); production use needs NVIDIA AI Enterprise. Governing terms: [NVIDIA Technology Access Terms of Use](https://developer.nvidia.com/legal/terms) - trial use is for evaluation, and no controlled or sensitive data may be submitted. We send only our fictional seed documents. |
-| Default model `meta/llama-3.3-70b-instruct` (until `carbonroom llm bench` picks another) | extraction proposals | [Llama 3.3 Community License](https://open.windriver.com/info/uni-license-list/licenses/llama-3.3-license-2024.html). If Llama stays our model, the README must display "Built with Llama". Update this row if the bench picks a different model. |
+| Extraction model `nvidia/nemotron-3-ultra-550b-a55b` on NVIDIA (chosen by `carbonroom llm bench`, 2026-11-03; Llama 3.3 70B was retired, HTTP 410) | extraction proposals | [OpenMDW License Agreement 1.1](https://github.com/OpenMDW/OpenMDW/blob/main/1.1/LICENSE.OpenMDW-1.1), per the model's [NGC governing terms](https://catalog.ngc.nvidia.com/orgs/nim/nvidia/models/nemotron-3-ultra-550b-a55b/-/governing-terms). We only call the hosted API; no weights are redistributed. |
 | Anthropic API (optional) | same proposals via the OpenAI SDK compatibility layer | [Anthropic docs](https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk); the page notes the layer is meant for testing and comparing models. |
 
 ## Data

@@ -2,7 +2,7 @@
   "schema": "cr.extraction-cache.v1",
   "sha256": "ca24e7e668b15da3ced77655219c51e88b7f927d8d5327558ba224b90c702b5e",
   "file": "2026-10_nimbus_cloud_NC-2610.pdf",
-  "proposer": "rules-v1",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
   "proposal": {
     "schema": "cr.extraction.v1",
     "doc_kind": "cloud_invoice",
@@ -13,7 +13,7 @@
     },
     "replaces_ref": null,
     "site": {
-      "value": "us-east-va",
+      "value": "us-east-va (Virginia)",
       "excerpt": "Region: us-east-va (Virginia)",
       "page": 1
     },
@@ -41,9 +41,9 @@
             "page": 2
           },
           "cloud_region": {
-            "value": "us-east-va",
+            "value": "us-east-va (Virginia)",
             "excerpt": "Region: us-east-va (Virginia)",
-            "page": 1
+            "page": 2
           }
         }
       }

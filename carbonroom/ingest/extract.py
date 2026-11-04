@@ -314,16 +314,19 @@ Rules:
   IT equipment energy for a cloud account. Ignore money, demand (kW), meter reads and history.
 - Field names: diesel -> delivery_ref, delivery_date; cloud_compute -> pue, wue_l_per_kwh, cloud_region;
   electricity/natural_gas -> meter_id. REC -> certificate_id, region (generation region), vintage (year).
-- The site for an REC is the load it is claimed against."""
+- "site" is WHERE the energy was used, never the customer company name: the service location on a
+  utility bill, the delivery location on a fuel invoice, the region line (e.g. "Region: ...") on a cloud
+  invoice, and the load it is claimed against on an REC."""
 
 
-def llm_propose(file_name: str, pages: list[str], model: str | None = None) -> tuple[dict[str, Any], str]:
+def llm_propose(file_name: str, pages: list[str], model: str | None = None,
+                attempts: int | None = None) -> tuple[dict[str, Any], str]:
     body = "\n\n".join(f"=== PAGE {i} ===\n{text}" for i, text in enumerate(pages, start=1))
     messages = [
         {"role": "system", "content": LLM_SYSTEM},
         {"role": "user", "content": f"File name: {file_name}\n\n{body}"},
     ]
-    proposal, p = llm.chat_json(messages, model=model)
+    proposal, p = llm.chat_json(messages, model=model, max_tokens=3000, attempts=attempts)  # room for reasoning
     proposal.setdefault("schema", PROPOSAL_SCHEMA)
     return proposal, p.label
 
@@ -498,6 +501,27 @@ def _verify_site(pages, obj, match_sites: SiteMatcher) -> tuple[str | None, Veri
     return site_id, evidence, None
 
 
+def site_named_in_document(pages: list[str], match_sites: SiteMatcher) -> tuple[str, VerifiedField] | None:
+    """If the whole document names exactly ONE known site, return it with the first line naming it.
+
+    Used only when the proposer pointed at a line that names no site (e.g. "Customer: Brightwell
+    Manufacturing"). Code finds the evidence itself; a document naming two sites gets no fallback.
+    """
+    first_line: dict[str, tuple[int, int, str]] = {}
+    for page_no, text in enumerate(pages, start=1):
+        _, lines = _page_index(text)
+        for line_no, (_, _, line) in enumerate(lines, start=1):
+            for site_id in match_sites(line):
+                first_line.setdefault(site_id, (page_no, line_no, line))
+    if len(first_line) != 1:
+        return None
+    site_id, (page_no, line_no, line) = next(iter(first_line.items()))
+    return site_id, VerifiedField("site", site_id, line, f"page={page_no};line={line_no}", excerpt_sha256(line))
+
+
+_SITE_FALLBACK_REASONS = ("no site evidence proposed", "site excerpt was not found", "site excerpt names 0 known")
+
+
 def _verify_period(pages, obj) -> tuple[str | None, VerifiedField | None, str | None]:
     if not isinstance(obj, dict) or not obj.get("excerpt"):
         return None, None, "no period evidence proposed"
@@ -567,6 +591,12 @@ def verify(proposal: dict[str, Any], pages: list[str], match_sites: SiteMatcher,
         if replaces_ref is None:
             failures.append(Failure("doc", f"replaces_ref: {reason}"))
     site_id, site_ev, site_reason = _verify_site(pages, proposal.get("site"), match_sites)
+    notes: list[str] = []
+    if site_id is None and site_reason and site_reason.startswith(_SITE_FALLBACK_REASONS):
+        found = site_named_in_document(pages, match_sites)
+        if found:
+            site_id, site_ev = found
+            notes.append(f"site resolved by code from the document ({site_reason}): {site_ev.excerpt}")
     period, period_ev, period_reason = _verify_period(pages, proposal.get("period"))
 
     claims: list[VerifiedClaim] = []
@@ -647,4 +677,5 @@ def verify(proposal: dict[str, Any], pages: list[str], match_sites: SiteMatcher,
         claims=claims,
         instruments=instruments,
         failures=failures,
+        notes=notes,
     )

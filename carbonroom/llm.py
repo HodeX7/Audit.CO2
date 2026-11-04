@@ -32,7 +32,9 @@ PROVIDERS = {
         "base_url": "https://integrate.api.nvidia.com/v1",
         "key_env": "NVIDIA_API_KEY",
         "base_env": "NVIDIA_BASE_URL",
-        "default_model": "meta/llama-3.3-70b-instruct",
+        # No default: NVIDIA retires hosted models (meta/llama-3.3-70b-instruct returned HTTP 410 on
+        # 2026-11-03) and some listed models answer 404. Pick one with `carbonroom llm probe` + `llm bench`.
+        "default_model": None,
     },
     "anthropic": {
         "base_url": "https://api.anthropic.com/v1/",
@@ -44,7 +46,13 @@ PROVIDERS = {
 
 
 class LLMError(RuntimeError):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+# HTTP statuses that mean "this model/key won't work"; retrying or trying more documents is pointless.
+UNAVAILABLE_STATUS = {401, 403, 404, 410}
 
 
 class LLMNotConfigured(LLMError):
@@ -63,7 +71,7 @@ class Provider:
         return f"llm:{self.name}:{self.model}"
 
 
-def provider(model: str | None = None) -> Provider:
+def provider(model: str | None = None, *, need_model: bool = True) -> Provider:
     name = (config.env("LLM_PROVIDER", "nvidia") or "nvidia").lower()
     if name not in PROVIDERS:
         raise LLMNotConfigured(f"LLM_PROVIDER={name!r} is not supported (use nvidia or anthropic)")
@@ -71,11 +79,15 @@ def provider(model: str | None = None) -> Provider:
     key = config.env(spec["key_env"])
     if not key:
         raise LLMNotConfigured(f"{spec['key_env']} is not set")
+    chosen = model or config.env("LLM_MODEL", spec["default_model"])
+    if need_model and not chosen:
+        raise LLMNotConfigured("LLM_MODEL is not set; find a working one with `carbonroom llm probe`, "
+                               "then compare with `carbonroom llm bench`")
     return Provider(
         name=name,
         base_url=config.env(spec["base_env"], spec["base_url"]),
         api_key=key,
-        model=model or config.env("LLM_MODEL", spec["default_model"]),
+        model=chosen or "",
     )
 
 
@@ -119,7 +131,10 @@ def limiter() -> RateLimiter:
 def _client(p: Provider):
     from openai import OpenAI
 
-    return OpenAI(base_url=p.base_url, api_key=p.api_key, timeout=60.0, max_retries=0)
+    # NVIDIA's free endpoints sometimes hang; a short timeout + few attempts keeps a stuck model from
+    # blocking an upload for minutes (auto mode then falls back to the rules proposer).
+    timeout = float(config.env("CR_LLM_TIMEOUT", "45"))
+    return OpenAI(base_url=p.base_url, api_key=p.api_key, timeout=timeout, max_retries=0)
 
 
 def _retry_after(exc: Exception) -> float | None:
@@ -137,7 +152,7 @@ def chat(
     *,
     model: str | None = None,
     max_tokens: int = 1500,
-    attempts: int = 5,
+    attempts: int | None = None,
     client: Any = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> tuple[str, Provider]:
@@ -146,6 +161,7 @@ def chat(
 
     p = provider(model)
     cli = client or _client(p)
+    attempts = attempts or int(config.env("CR_LLM_ATTEMPTS", "3"))
     kwargs: dict[str, Any] = {"model": p.model, "messages": messages, "max_tokens": max_tokens}
     if p.name == "nvidia":
         kwargs["temperature"] = 0
@@ -161,7 +177,8 @@ def chat(
             delay = _retry_after(exc) or min(30.0, 2.0 * (2**attempt))
             sleep(delay)
         except openai.APIStatusError as exc:  # 4xx other than 429: not retryable
-            raise LLMError(f"{p.name} API error {exc.status_code}: {exc.message}") from exc
+            raise LLMError(f"{p.name} API error {exc.status_code} for {p.model}: {_error_detail(exc)}",
+                           status_code=exc.status_code) from exc
     raise LLMError(f"{p.name} API failed after {attempts} attempts: {last}")
 
 
@@ -205,6 +222,44 @@ def chat_json(messages: list[dict[str, Any]], **kwargs: Any) -> tuple[dict[str, 
     return parse_json_object(text), p
 
 
+def _error_detail(exc: Exception) -> str:
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        for key in ("detail", "message", "error", "title"):
+            if body.get(key):
+                return str(body[key])[:240]
+    return str(getattr(exc, "message", exc))[:240]
+
+
 def list_models() -> list[str]:
-    p = provider()
+    p = provider(need_model=False)
     return sorted(m.id for m in _client(p).models.list().data)
+
+
+# Model ids that are clearly not chat/instruct models (embeddings, guards, OCR, speech, ...).
+_NOT_CHAT = re.compile(
+    r"embed|safety|guard|reward|parse|rerank|retriev|clip|ocr|asr|tts|speech|audio|translat|detector|"
+    r"segment|diffusion|flux|sdxl|cosmos|pii|topic-control|content-safety|bge|e5-|nv-dino|deplot|coder",
+    re.IGNORECASE,
+)
+
+
+def looks_like_chat_model(model_id: str) -> bool:
+    return not _NOT_CHAT.search(model_id)
+
+
+def probe(model: str, *, client: Any = None, sleep: Callable[[float], None] = time.sleep) -> dict[str, Any]:
+    """One tiny call: does this model answer chat completions for this key, and does it return JSON?"""
+    started = time.monotonic()
+    messages = [{"role": "user", "content": 'Reply with exactly this JSON and nothing else: {"ok": true}'}]
+    try:
+        text, _ = chat(messages, model=model, max_tokens=600, attempts=2, client=client, sleep=sleep)
+    except LLMError as exc:
+        return {"model": model, "ok": False, "status": exc.status_code, "json_ok": False,
+                "seconds": round(time.monotonic() - started, 1), "error": str(exc)}
+    try:
+        json_ok = parse_json_object(text).get("ok") is True
+    except (LLMError, json.JSONDecodeError):
+        json_ok = False
+    return {"model": model, "ok": True, "status": 200, "json_ok": json_ok,
+            "seconds": round(time.monotonic() - started, 1), "error": None}

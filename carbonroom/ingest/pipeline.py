@@ -65,7 +65,7 @@ def ingest_file(
             original_name=path.name,
             doc_ref=ex.doc_ref.value if ex.doc_ref else None,
             page_count=len(pages),
-            meta={**inc.meta, "proposer": proposed.proposer, "notes": proposed.notes},
+            meta={**inc.meta, "proposer": proposed.proposer, "notes": proposed.notes + ex.notes},
             actor=ACTOR,
         )
         if not created:  # another process won the race
@@ -81,7 +81,7 @@ def ingest_file(
         kind=kind,
         doc_ref=doc["doc_ref"],
         proposer=proposed.proposer,
-        notes=proposed.notes,
+        notes=proposed.notes + ex.notes,
         site=ex.site_id,
         period=ex.period,
         activities=[
