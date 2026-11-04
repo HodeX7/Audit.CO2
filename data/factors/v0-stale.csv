@@ -1,0 +1,2 @@
+id,set_version,category,region,scope,factor,unit,source_name,source_edition,valid_from,valid_to
+ef-elec-erct-loc-v0,v0-stale,electricity,ERCT,2_location,0.35122,kg_co2e_per_kwh,EPA eGRID2022,"published 2024-01 summary tables (17th edition, 2022 data) - Total Output Emission Rate CO2e. Superseded by eGRID2023; kept only to drive the stale-factor demo trap.",2024-01-01,2025-01-15

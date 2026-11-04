@@ -1,0 +1,21 @@
+{
+  "type": "cr.report.v1",
+  "company": "Brightwell Manufacturing",
+  "period": "2026-10",
+  "status": "DRAFT | PUBLISHED",
+  "factor_set": {"version": "", "sources": [{"name": "", "edition": ""}]},
+  "totals_t_co2e": {"scope1": 0, "scope2_location": 0, "scope2_market": 0},
+  "data_centre": {"scope": "3 (Cat 1, purchased cloud services)", "it_kwh": 0, "pue": 0, "facility_kwh": 0, "wue_l_per_kwh": 0, "water_l": 0,
+                  "co2e_location_t": 0, "co2e_market_t": 0, "rec_quality": "ok | flagged"},
+  "by_site": [{"site": "", "scope1": 0, "scope2_location": 0, "scope2_market": 0}],
+  "mom_change_pct": {"scope1": 0, "scope2_location": 0},
+  "coverage_pct": 0,
+  "unverified_excluded_t_co2e": 0,
+  "verified_items": [{"activity_id": "", "category": "", "quantity": 0, "unit": "", "co2e_kg": 0}],
+  "unverified_items": [{"activity_id": "", "reason": ""}],
+  "gaps": [{"gap_id": "", "kind": "", "status": "", "owner": "", "resolution": ""}],
+  "evidence_index": [{"activity_id": "", "source_doc": "", "excerpt": "", "locator": "", "sha256": ""}],
+  "approver": null,
+  "generated_at": "ISO-8601",
+  "report_sha256": ""
+}

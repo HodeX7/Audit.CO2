@@ -1,0 +1,7 @@
+id,set_version,category,region,scope,factor,unit,source_name,source_edition,valid_from,valid_to
+ef-natgas-us-1-v1,v1-2026-10,natural_gas,US,1,53.117,kg_co2e_per_mmbtu,EPA GHG Emission Factors Hub,"January 2025 edition (Table 1 Stationary Combustion; CH4/N2O rolled up with AR6 GWP via GHG Protocol Aug 2024 table)",2025-01-01,
+ef-diesel-us-1-v1,v1-2026-10,diesel,US,1,10.244,kg_co2e_per_gallon,EPA GHG Emission Factors Hub,"January 2025 edition (Distillate Fuel Oil No. 2 row; CH4/N2O rolled up with AR6 GWP via GHG Protocol Aug 2024 table)",2025-01-01,
+ef-elec-erct-loc-v1,v1-2026-10,electricity,ERCT,2_location,0.33413,kg_co2e_per_kwh,EPA eGRID2023,"rev2 June 2025 (18th edition, 2023 data) - Total Output Emission Rate CO2e",2025-06-12,
+ef-elec-nwpp-loc-v1,v1-2026-10,electricity,NWPP,2_location,0.28815,kg_co2e_per_kwh,EPA eGRID2023,"rev2 June 2025 (18th edition, 2023 data) - Total Output Emission Rate CO2e",2025-06-12,
+ef-elec-erct-mkt-v1,v1-2026-10,electricity,ERCT,2_market,0.37368,kg_co2_per_kwh,Green-e Residual Mix,"2025 edition (2023 data) released 2026-01-29 - Adjusted System Mix; CO2 only (table does not report CH4/N2O so this is not full CO2e)",2026-01-29,
+ef-elec-nwpp-mkt-v1,v1-2026-10,electricity,NWPP,2_market,0.29780,kg_co2_per_kwh,Green-e Residual Mix,"2025 edition (2023 data) released 2026-01-29 - Adjusted System Mix; CO2 only (table does not report CH4/N2O so this is not full CO2e)",2026-01-29,
