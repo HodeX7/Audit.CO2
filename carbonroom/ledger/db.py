@@ -25,6 +25,7 @@ from typing import Any, Iterable, Iterator
 from carbonroom import config
 
 SCHEMA_VERSION = "1"
+GRAPH_VERSION = "1"  # bump when the ledger_nodes / ledger_edges views in contracts/schema.sql change
 
 ACTIVITY_STATUSES = ("UNVERIFIED", "VERIFIED", "FLAGGED", "EXCLUDED", "SUPERSEDED")
 # SUPERSEDED is reached only through supersede_activity(), which also sets superseded_by.
@@ -146,6 +147,29 @@ def init_db(conn: sqlite3.Connection) -> None:
     migrate(conn)
 
 
+def _refresh_graph_views(conn: sqlite3.Connection) -> bool:
+    """Recreate the knowledge-graph views if contracts/schema.sql has a newer definition (GRAPH_VERSION)."""
+    import re
+
+    row = conn.execute("SELECT value FROM schema_meta WHERE key = 'graph_version'").fetchone()
+    if row and row["value"] == GRAPH_VERSION:
+        return False
+    statements = re.findall(r"CREATE VIEW IF NOT EXISTS (\w+).*?;", config.schema_path().read_text(encoding="utf-8"),
+                            flags=re.S)
+    with transaction(conn):
+        row = conn.execute("SELECT value FROM schema_meta WHERE key = 'graph_version'").fetchone()
+        if row and row["value"] == GRAPH_VERSION:
+            return False
+        text = config.schema_path().read_text(encoding="utf-8")
+        for name in reversed(statements):  # ledger_nodes reads ledger_edges, so drop it first
+            conn.execute(f"DROP VIEW IF EXISTS {name}")
+        for match in re.finditer(r"CREATE VIEW IF NOT EXISTS \w+.*?;", text, flags=re.S):
+            conn.execute(match.group(0))
+        conn.execute("INSERT INTO schema_meta(key, value) VALUES ('graph_version', ?) "
+                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (GRAPH_VERSION,))
+    return True
+
+
 # Additive columns added after schema v1 go here as (table, column, DDL type clause).
 _ADDITIVE_COLUMNS: list[tuple[str, str, str]] = []
 
@@ -163,6 +187,8 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (SCHEMA_VERSION,),
     )
+    if _refresh_graph_views(conn):
+        applied.append(f"graph views v{GRAPH_VERSION}")
     return applied
 
 

@@ -26,6 +26,14 @@ Conventions written into the schema header:
   can't be closed without `resolved_by` + `resolution`; a period can't be `CLOSED` without a recorded
   `APPROVE` by the same handle.
 
+## 2026-11-04 - knowledge-graph views (Ujjwal) - PROPOSED, additive, read-only
+
+Two views added to `contracts/schema.sql`: `ledger_edges(src_type, src_id, rel, dst_type, dst_id, detail)` and
+`ledger_nodes(type, id, label, status, period_id)`. No table or column changes; nothing is stored twice. Gap
+`refs_json` keys `activity_ids`, `activity_id`, `source_doc_id`, `instrument_id` become graph edges (please use
+them when opening gaps). `schema_meta.graph_version` lets `migrate()` rebuild the views when they change.
+Details: `docs/features/knowledge-graph.md`.
+
 ## Noted for Akshar (chat formats, 5.4)
 
 The gap example says "Please drop the **September** electricity bill" for a `2026-10` gap. It should say

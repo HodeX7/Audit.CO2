@@ -170,6 +170,60 @@ def _ingest_batch(conn, args, meta) -> int:
     return 0
 
 
+def cmd_ledger_trace(args) -> int:
+    """Where did this come from? A number gets its full lineage; anything else, its outgoing graph."""
+    from carbonroom.ledger import graph
+
+    conn = _connect(args)
+    node_type, node_id = graph.resolve(conn, args.ref)
+    if node_type in ("activity", "calculation"):
+        data = graph.lineage(conn, f"{node_type}:{node_id}")
+        conn.close()
+        if args.json:
+            _print_json({k: v for k, v in data.items() if k != "text"})
+        else:
+            print(data["text"])
+        return 0
+    walked = graph.walk(conn, node_type, node_id, direction="out", max_depth=args.depth)
+    conn.close()
+    print(graph.to_json(walked) if args.json else "\n".join(graph.tree_lines(walked)))
+    return 0
+
+
+def cmd_ledger_impact(args) -> int:
+    """What depends on this? (e.g. a bill -> its numbers -> their calculations, and gaps about them)"""
+    from carbonroom.ledger import graph
+
+    conn = _connect(args)
+    walked = graph.impact(conn, args.ref, max_depth=args.depth)
+    conn.close()
+    if args.json:
+        print(graph.to_json(walked))
+        return 0
+    print("\n".join(graph.tree_lines(walked)))
+    deps = walked["depends"]
+    summary = ", ".join(f"{len(v)} {graph.plural(k, len(v))}" for k, v in sorted(deps.items())) or "nothing"
+    print(f"\nDepends on {walked['start']}: {summary}")
+    return 0
+
+
+def cmd_ledger_graph(args) -> int:
+    """One month as a knowledge graph, as Mermaid (renders on GitHub) or JSON."""
+    from carbonroom.ledger import graph
+
+    conn = _connect(args)
+    g = graph.period_graph(conn, args.period, max_depth=args.depth, site=args.site)
+    conn.close()
+    text = graph.to_json(g) if args.format == "json" else graph.to_mermaid(g)
+    if args.out:
+        body = text if args.format == "json" or not args.out.endswith(".md") else f"```mermaid\n{text}```\n"
+        Path(args.out).write_text(body, encoding="utf-8")
+        print(f"wrote {args.out}: {len(g['nodes'])} nodes, {len(g['edges'])} edges", file=sys.stderr)
+    else:
+        print(text, end="")
+    return 0
+
+
 def cmd_ledger_runs(args) -> int:
     from carbonroom.ingest import batch
 
@@ -611,6 +665,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--period", required=True)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_ledger_missing)
+    p = ledger.add_parser("trace", help="knowledge graph: where did this number / bill / gap come from?")
+    p.add_argument("ref", help="ACT-..., CALC-..., GAP-..., DOC-..., a bill number (ELB-AUS-2610), @person, site, YYYY-MM")
+    p.add_argument("--depth", type=int, default=6)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_ledger_trace)
+    p = ledger.add_parser("impact", help="knowledge graph: what depends on this (if this bill is wrong...)?")
+    p.add_argument("ref")
+    p.add_argument("--depth", type=int, default=4)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_ledger_impact)
+    p = ledger.add_parser("graph", help="knowledge graph of one month as Mermaid or JSON")
+    p.add_argument("--period", required=True)
+    p.add_argument("--site", help="only this site's part of the month (e.g. austin)")
+    p.add_argument("--format", choices=["mermaid", "json"], default="mermaid")
+    p.add_argument("--depth", type=int, default=3)
+    p.add_argument("--out", help="write to a file (.md gets a ```mermaid fence)")
+    p.set_defaults(func=cmd_ledger_graph)
     p = ledger.add_parser("runs", help="past background batch runs and their final summaries")
     p.add_argument("--id", help="one run's summary")
     p.add_argument("--limit", type=int, default=20)

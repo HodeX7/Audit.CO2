@@ -209,9 +209,10 @@ def test_feature_docs_have_the_required_sections(doc):
 # --- schema and kinds ---------------------------------------------------------------------------
 
 
-def test_ledger_doc_lists_every_table_and_kind():
+def test_ledger_doc_lists_every_table_view_and_kind():
     spans = set(inline_spans(read(FEATURES / "ledger.md")))
-    tables = set(re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)", read(REPO / "contracts" / "schema.sql")))
+    schema = read(REPO / "contracts" / "schema.sql")
+    tables = set(re.findall(r"CREATE (?:TABLE|VIEW) IF NOT EXISTS (\w+)", schema))
     assert tables - spans == set()
     assert set(db.GAP_KINDS) - spans == set()
     assert set(db.DOC_KINDS) - spans == set()
@@ -230,6 +231,26 @@ def test_seed_readme_lists_every_seed_document():
     readme = read(REPO / "data" / "seed" / "README.md")
     manifest = json.loads(read(REPO / "data" / "seed" / "manifest.json"))
     assert [e["file"] for e in manifest if e["file"] not in readme] == []
+
+
+def test_knowledge_graph_examples_match_the_code(env, capsys):
+    from carbonroom.cli import main
+
+    main(["seed"])
+    main(["ingest", "data/seed/later/2026-10_austin_electricity_ELB-AUS-2610-C.pdf", "--from", "omar",
+          "--room", "cr-site-austin"])
+    text = read(FEATURES / "knowledge-graph.md")
+    for name, argv in (("trace", ["ledger", "trace", "ACT-0739d5932d"]), ("impact", ["ledger", "impact", "ELB-AUS-2610"]),
+                       ("graph", ["ledger", "graph", "--period", "2026-10", "--site", "austin"])):
+        capsys.readouterr()
+        main(argv)
+        actual = capsys.readouterr().out
+        block = re.search(rf"<!-- example:{name}:start -->\n```\w+\n(.*?)```\n<!-- example:{name}:end -->", text, re.S)
+        assert block, f"example:{name} markers missing"
+        documented = block.group(1)
+        if name != "graph":
+            documented = documented.split("\n", 1)[1]  # drop the "$ carbonroom ..." line
+        assert documented.rstrip("\n") == actual.rstrip("\n"), f"regenerate the {name} example in knowledge-graph.md"
 
 
 def test_seed_counts_written_in_docs_match_a_real_seed(env):

@@ -133,6 +133,21 @@ Adding your own CLI commands without touching `cli.py`: create one of `carbonroo
 `carbonroom/check/cli.py`, `carbonroom/report/cli.py` or `carbonroom/switchbridge/cli.py` with a
 `register(subparsers)` function; it is loaded automatically.
 
+### For everyone: the knowledge graph
+
+The ledger is also a graph (live SQL views `ledger_nodes` / `ledger_edges`; `carbonroom.ledger.graph`):
+
+- **"Where did this number come from?"** `graph.lineage(conn, "ACT-..." or "CALC-...")["text"]`, or
+  `carbonroom ledger trace ACT-...`. Gives the excerpt, page/line, file hash, sender, room, model, corrections,
+  calculation + factor, and open gaps. Ready to post as a chat answer, or to use for the report's evidence index.
+- **"If this bill is wrong, what changes?"** `graph.impact(conn, "ELB-AUS-2610")["depends"]`, or
+  `carbonroom ledger impact ELB-AUS-2610`. Useful for the false-done reopen.
+- **Richa:** to link a gap to rows, put them in `refs` when you call `db.create_gap`: `activity_ids` (list),
+  `activity_id`, `source_doc_id` or `instrument_id`. They become `about` edges automatically. This replaces the
+  stand-in `gap_activities` side table in your branch.
+- **Akshar:** `carbonroom ledger graph --period 2026-10 [--site austin] --out graph.md` draws a Mermaid graph for
+  the README and video. Details: `docs/features/knowledge-graph.md`.
+
 ### For everyone: calling a model from your own agent code (model-agnostic)
 
 ```python

@@ -2,7 +2,7 @@
 
 Each owner updates their own section: done / next / blocked.
 
-## Ujjwal (Ingestion & Ledger), updated 2026-11-04 00:20 CT
+## Ujjwal (Ingestion & Ledger), updated 2026-11-04 14:20 CT
 
 **Done**
 - `contracts/schema.sql` (Section 5.3, plus the additive columns in `contracts/CHANGES.md`) and `carbonroom/ledger/db.py`
@@ -16,10 +16,12 @@ Each owner updates their own section: done / next / blocked.
 - Feature docs (`docs/features/`) and a docs-drift test (`tests/test_docs.py`)
 - Model-agnostic LLM layer (any provider, per-task models, pluggable SDKs)
 - Background batch run for the orchestrator: parallel, one final summary, `collect_node` for LangGraph
+- Knowledge graph: live graph views, `ledger trace` (where did this number come from?), `ledger impact` (what depends on this bill?), `ledger graph` (Mermaid/JSON)
 - LLM: `nvidia/nemotron-3-ultra-550b-a55b`, bench 13/13 exact (backup `nvidia/nemotron-3.5-bolt-e4b`, also 13/13); seed extractions re-saved with it
 
 **Next**
-- PR #1 (`feat/ingest`) is open; then the docs, LLM and batch-run PRs (stacked): Akshar to merge in order
+- PR #1 merged. PR #2 landed on `feat/ingest` instead of `main` (stacked base): retarget #3, #4 and the knowledge-graph PR to `main` and merge in order
+- Help Richa move her branch onto `main` and `carbonroom.ledger.db` (her branch has no shared history and uses a stand-in `carbonroom/db.py`)
 - Possible next (asked, not started): collector explains its decisions ('why didn't you consider X?'); evidence tags like [S-014]; check typed numbers against bills
 - Team sign-off on `contracts/CHANGES.md`
 - Stretch, only after everything else works: Drive/email connectors using fictional files only

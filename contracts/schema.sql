@@ -271,4 +271,74 @@ WHEN NEW.status = 'CLOSED' AND NOT EXISTS (
   WHERE a.period_id = NEW.id AND a.decision = 'APPROVE' AND a.approver_handle = NEW.approved_by)
 BEGIN SELECT RAISE(ABORT, 'carbonroom: a period closes only after a recorded human APPROVE'); END;
 
+-- ---------------------------------------------------------------------------
+-- Knowledge graph (additive, read-only VIEWS - nothing is stored twice, so the graph can never
+-- disagree with the tables). Every row is a node; every reference is a typed edge.
+-- Node ids are "<type>:<id>" in the Python API (carbonroom/ledger/graph.py).
+-- Gap refs_json keys that become edges: source_doc_id, activity_id, activity_ids[], instrument_id.
+-- Changing a view? Bump GRAPH_VERSION in carbonroom/ledger/db.py; migrate() recreates the views.
+-- ---------------------------------------------------------------------------
+
+CREATE VIEW IF NOT EXISTS ledger_edges(src_type, src_id, rel, dst_type, dst_id, detail) AS
+  SELECT 'activity', id, 'evidenced_by', 'doc', source_doc_id, excerpt_locator FROM activities
+  UNION ALL SELECT 'activity', id, 'at_site', 'site', site_id, NULL FROM activities
+  UNION ALL SELECT 'activity', id, 'in_period', 'period', period_id, NULL FROM activities
+  UNION ALL SELECT 'activity', id, 'superseded_by', 'activity', superseded_by, status_reason
+            FROM activities WHERE superseded_by IS NOT NULL
+  UNION ALL SELECT 'activity', a.id, 'replaces', 'activity', j.value, NULL
+            FROM activities a, json_each(a.extra_json, '$.replaces_activity_ids') j
+  UNION ALL SELECT 'doc', id, 'superseded_by', 'doc', superseded_by, NULL FROM source_docs WHERE superseded_by IS NOT NULL
+  UNION ALL SELECT 'doc', id, 'received_from', 'person', received_from, NULL FROM source_docs WHERE received_from IS NOT NULL
+  UNION ALL SELECT 'doc', id, 'posted_in', 'room', room, NULL FROM source_docs WHERE room IS NOT NULL
+  UNION ALL SELECT 'doc', id, 'collected_in', 'run', json_extract(meta_json, '$.run_id'), NULL
+            FROM source_docs WHERE json_extract(meta_json, '$.run_id') IS NOT NULL
+  UNION ALL SELECT 'doc', id, 'answers', 'gap', json_extract(meta_json, '$.gap_id'), NULL
+            FROM source_docs WHERE json_extract(meta_json, '$.gap_id') IS NOT NULL
+  UNION ALL SELECT 'instrument', id, 'evidenced_by', 'doc', source_doc_id, excerpt_locator FROM instruments
+  UNION ALL SELECT 'instrument', id, 'claimed_against', 'site', site_id, NULL FROM instruments WHERE site_id IS NOT NULL
+  UNION ALL SELECT 'instrument', id, 'in_period', 'period', period_id, NULL FROM instruments
+  UNION ALL SELECT 'instrument', id, 'superseded_by', 'instrument', superseded_by, NULL
+            FROM instruments WHERE superseded_by IS NOT NULL
+  UNION ALL SELECT 'calculation', id, 'of', 'activity', activity_id, scope FROM calculations
+  UNION ALL SELECT 'calculation', id, 'uses_factor', 'factor', factor_id, NULL FROM calculations
+  UNION ALL SELECT 'gap', id, 'about_site', 'site', site_id, NULL FROM gaps WHERE site_id IS NOT NULL
+  UNION ALL SELECT 'gap', id, 'in_period', 'period', period_id, NULL FROM gaps WHERE period_id IS NOT NULL
+  UNION ALL SELECT 'gap', id, 'owned_by', 'person', owner_handle, NULL FROM gaps WHERE owner_handle IS NOT NULL
+  UNION ALL SELECT 'gap', id, 'raised_in', 'room', room, NULL FROM gaps WHERE room IS NOT NULL
+  UNION ALL SELECT 'gap', id, 'resolved_by', 'person', resolved_by, resolution FROM gaps WHERE resolved_by IS NOT NULL
+  UNION ALL SELECT 'gap', id, 'about', 'doc', json_extract(refs_json, '$.source_doc_id'), NULL
+            FROM gaps WHERE json_extract(refs_json, '$.source_doc_id') IS NOT NULL
+  UNION ALL SELECT 'gap', id, 'about', 'activity', json_extract(refs_json, '$.activity_id'), NULL
+            FROM gaps WHERE json_extract(refs_json, '$.activity_id') IS NOT NULL
+  UNION ALL SELECT 'gap', g.id, 'about', 'activity', j.value, NULL
+            FROM gaps g, json_each(g.refs_json, '$.activity_ids') j
+  UNION ALL SELECT 'gap', id, 'about', 'instrument', json_extract(refs_json, '$.instrument_id'), NULL
+            FROM gaps WHERE json_extract(refs_json, '$.instrument_id') IS NOT NULL
+  UNION ALL SELECT 'site', id, 'owned_by', 'person', owner_handle, NULL FROM sites WHERE owner_handle IS NOT NULL
+  UNION ALL SELECT 'site', id, 'has_room', 'room', room, NULL FROM sites WHERE room IS NOT NULL
+  UNION ALL SELECT 'expected', id, 'for_site', 'site', site_id, category FROM expected_documents
+  UNION ALL SELECT 'approval', id, 'for_period', 'period', period_id, decision FROM approvals
+  UNION ALL SELECT 'approval', id, 'by', 'person', approver_handle, note FROM approvals
+  UNION ALL SELECT 'period', id, 'approved_by', 'person', approved_by, closed_at FROM periods WHERE approved_by IS NOT NULL;
+
+CREATE VIEW IF NOT EXISTS ledger_nodes(type, id, label, status, period_id) AS
+  SELECT 'site', id, name, kind, NULL FROM sites
+  UNION ALL SELECT 'period', id, id, status, id FROM periods
+  UNION ALL SELECT 'doc', id, COALESCE(doc_ref, original_name, path),
+            CASE WHEN superseded_by IS NULL THEN 'current' ELSE 'superseded' END, NULL FROM source_docs
+  UNION ALL SELECT 'activity', id, category || ' ' || quantity || ' ' || unit, status, period_id FROM activities
+  UNION ALL SELECT 'instrument', id, kind || ' ' || mwh || ' MWh ' || COALESCE(certificate_id, ''), status, period_id
+            FROM instruments
+  UNION ALL SELECT 'gap', id, id || ' ' || kind, status, period_id FROM gaps
+  UNION ALL SELECT 'calculation', id, scope || ' ' || co2e_kg || ' kg CO2e', code_version, NULL FROM calculations
+  UNION ALL SELECT 'factor', id, category || ' ' || factor || ' ' || unit || ' (' || source_name || ', ' || source_edition || ')',
+            set_version, NULL FROM emission_factors
+  UNION ALL SELECT 'expected', id, category || ' (' || frequency || ')', frequency, NULL FROM expected_documents
+  UNION ALL SELECT 'approval', id, decision || ' by ' || approver_handle, decision, period_id FROM approvals
+  UNION ALL SELECT DISTINCT 'person', dst_id, '@' || dst_id, NULL, NULL FROM ledger_edges WHERE dst_type = 'person'
+  UNION ALL SELECT DISTINCT 'room', dst_id, dst_id, NULL, NULL FROM ledger_edges WHERE dst_type = 'room'
+  UNION ALL SELECT DISTINCT 'run', dst_id, dst_id, NULL, NULL FROM ledger_edges WHERE dst_type = 'run';
+
+INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('graph_version', '1');
+
 INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('schema_version', '1');

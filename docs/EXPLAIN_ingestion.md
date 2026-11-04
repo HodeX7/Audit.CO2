@@ -83,6 +83,12 @@ the same verifier.
 **"Why is the cloud a 'site'?"** So its gaps go to Dev in `cr-cloud`, like any site's go to its owner. It is marked
 `kind = cloud`; purchased cloud is Scope 3 Category 1 and is kept out of the Scope 1+2 total.
 
+**"It's SQLite. Where's the knowledge graph?"** A knowledge graph is a way of modelling data, not a database
+product. Every ledger row is a node and every reference is a typed edge (bill → site, number → bill, gap → owner,
+corrected bill → original). Two live SQL views expose them, and a recursive SQL query walks them. Try
+`carbonroom ledger trace ACT-0739d5932d` or `carbonroom ledger impact ELB-AUS-2610`. No graph server is needed
+because the close only asks short, fixed-shape questions, and it keeps the demo one `git clone` away.
+
 **"What happens if two agents write at once?"** SQLite in WAL mode with a 30-second busy timeout. Writes take the
 lock (`BEGIN IMMEDIATE`), and a document is added together with its rows in one transaction, all or nothing.
 

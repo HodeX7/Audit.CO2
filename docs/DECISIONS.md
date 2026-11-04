@@ -36,6 +36,8 @@ One line each: decision, why, date. Newest at the bottom of each owner's section
 
 - Background batch run for the orchestrator: prepare (read + propose) in parallel threads with no ledger access, then commit in sorted-path order on the main thread, so ids and GAP numbers don't depend on worker count; one failing file is isolated (`errors`, `ingest_error` event) and nothing half-written remains; the `cr.batch.v1` summary (with a ready-to-post `summary_text`) is stored in the append-only `batch_finished` event, not a new table; `collect_node(state)` is LangGraph-ready without importing LangGraph (the orchestrator is a teammate's). 2026-11-04
 
+- Knowledge graph inside SQLite: two read-only views (`ledger_edges`, `ledger_nodes`) computed from the tables, so the graph is never stale and nothing is stored twice; traversal is one `WITH RECURSIVE` query (out = what this depends on, in = what depends on this) that doesn't walk through shared hubs (person, room, period, run, site); lineage/impact/month graphs with Mermaid + JSON export; gaps link to rows via `refs_json` keys. No graph server (e.g. Neo4j): the close asks short fixed-shape questions, and clone-and-run reproducibility is judged. 2026-11-04
+
 ## Richa (Calculation, Checker & Report)
 
 ## Akshar (Switch Room, Demo & Submission)

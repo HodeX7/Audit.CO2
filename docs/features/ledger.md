@@ -9,8 +9,9 @@ change or erase evidence. The ledger is that single source of truth. Agents talk
 
 ## Design
 
-SQLite, "graph-lite": rows link to each other by id (activity → source document → site → period;
-calculation → activity + factor; gap → site/period/rows). One file, `CR_DB_PATH` (default `./carbonroom.db`).
+SQLite, modelled as a graph: rows link to each other by id (activity → source document → site → period;
+calculation → activity + factor; gap → site/period/rows), and two read-only views expose those links as a
+knowledge graph ([knowledge-graph.md](knowledge-graph.md)). One file, `CR_DB_PATH` (default `./carbonroom.db`).
 
 ### Tables
 
@@ -28,6 +29,8 @@ calculation → activity + factor; gap → site/period/rows). One file, `CR_DB_P
 | `approvals` | human APPROVE/REJECT decisions, append-only |
 | `events` | append-only audit log of every write |
 | `expected_documents` | which evidence each site must send (`monthly` / `as_delivered`), for missing-bill detection |
+| `ledger_edges` (view) | every link between rows, as a typed edge: the [knowledge graph](knowledge-graph.md) |
+| `ledger_nodes` (view) | every row (plus people, rooms, runs) as a graph node with a label |
 
 Kinds: gap kinds `missing_doc`, `conflict`, `stale_factor`, `outlier`, `excerpt_mismatch`, `unverified_claim`,
 `rec_quality`. Document kinds `utility_bill`, `fuel_invoice`, `cloud_invoice`, `rec_certificate`, `other`.
