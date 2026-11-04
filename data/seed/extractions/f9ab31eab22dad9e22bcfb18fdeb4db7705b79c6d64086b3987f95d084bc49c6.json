@@ -1,0 +1,48 @@
+{
+  "schema": "cr.extraction-cache.v1",
+  "sha256": "f9ab31eab22dad9e22bcfb18fdeb4db7705b79c6d64086b3987f95d084bc49c6",
+  "file": "2026-09_austin_diesel_INV-188.pdf",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
+  "proposal": {
+    "schema": "cr.extraction.v1",
+    "doc_kind": "fuel_invoice",
+    "doc_ref": {
+      "value": "INV-188",
+      "excerpt": "Invoice number: INV-188",
+      "page": 1
+    },
+    "replaces_ref": null,
+    "site": {
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address) - backup generator tank",
+      "excerpt": "Deliver to: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address) - backup generator tank",
+      "page": 1
+    },
+    "period": {
+      "value": "2026-09",
+      "excerpt": "Delivery date: September 17, 2026",
+      "page": 1
+    },
+    "claims": [
+      {
+        "category": "diesel",
+        "quantity": "1,892.7",
+        "unit": "L",
+        "excerpt": "Quantity delivered: 1,892.7 L",
+        "page": 1,
+        "fields": {
+          "delivery_ref": {
+            "value": "DLV-7590",
+            "excerpt": "Delivery ticket: DLV-7590",
+            "page": 1
+          },
+          "delivery_date": {
+            "value": "September 17, 2026",
+            "excerpt": "Delivery date: September 17, 2026",
+            "page": 1
+          }
+        }
+      }
+    ],
+    "instruments": []
+  }
+}

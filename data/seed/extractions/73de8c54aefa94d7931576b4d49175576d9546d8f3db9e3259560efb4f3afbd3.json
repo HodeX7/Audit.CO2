@@ -1,0 +1,43 @@
+{
+  "schema": "cr.extraction-cache.v1",
+  "sha256": "73de8c54aefa94d7931576b4d49175576d9546d8f3db9e3259560efb4f3afbd3",
+  "file": "2026-10_reno_electricity_ELB-RNO-2610.pdf",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
+  "proposal": {
+    "schema": "cr.extraction.v1",
+    "doc_kind": "utility_bill",
+    "doc_ref": {
+      "value": "ELB-RNO-2610",
+      "excerpt": "Bill number: ELB-RNO-2610",
+      "page": 1
+    },
+    "replaces_ref": null,
+    "site": {
+      "value": "Reno Office, 77 Ledger Lane, Suite 300, Reno, NV",
+      "excerpt": "Service location: Reno Office, 77 Ledger Lane, Suite 300, Reno, NV (fictional address)",
+      "page": 1
+    },
+    "period": {
+      "value": "2026-10",
+      "excerpt": "Service period: October 1, 2026 - October 31, 2026",
+      "page": 1
+    },
+    "claims": [
+      {
+        "category": "electricity",
+        "quantity": "15.08",
+        "unit": "MWh",
+        "excerpt": "Total energy used this period: 15.08 MWh",
+        "page": 1,
+        "fields": {
+          "meter_id": {
+            "value": "SVE-0042-118",
+            "excerpt": "Meter: SVE-0042-118",
+            "page": 1
+          }
+        }
+      }
+    ],
+    "instruments": []
+  }
+}

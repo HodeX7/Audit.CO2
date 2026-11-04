@@ -1,0 +1,43 @@
+{
+  "schema": "cr.extraction-cache.v1",
+  "sha256": "64eb7ac2bcfc0a7180fde309566885ea81cadfc388f7431948c59b42ca9f8be9",
+  "file": "2026-09_austin_gas_GAS-AUS-2609.pdf",
+  "proposer": "llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b",
+  "proposal": {
+    "schema": "cr.extraction.v1",
+    "doc_kind": "utility_bill",
+    "doc_ref": {
+      "value": "GAS-AUS-2609",
+      "excerpt": "Bill number: GAS-AUS-2609",
+      "page": 1
+    },
+    "replaces_ref": null,
+    "site": {
+      "value": "Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
+      "excerpt": "Service location: Austin Plant, 4100 Foundry Row, Austin, TX (fictional address)",
+      "page": 1
+    },
+    "period": {
+      "value": "2026-09",
+      "excerpt": "Service period: September 1, 2026 - September 30, 2026",
+      "page": 1
+    },
+    "claims": [
+      {
+        "category": "natural_gas",
+        "quantity": "4,800",
+        "unit": "therms",
+        "excerpt": "Total gas used this period: 4,800 therms",
+        "page": 1,
+        "fields": {
+          "meter_id": {
+            "value": "PHG-M-3307",
+            "excerpt": "Meter: PHG-M-3307",
+            "page": 1
+          }
+        }
+      }
+    ],
+    "instruments": []
+  }
+}
