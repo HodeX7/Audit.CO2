@@ -7,7 +7,7 @@ Each owner keeps their own section up to date. Shared contracts: `contracts/`.
 ## From Ujjwal (Ingestion & Ledger) → Richa and Akshar
 
 **State:** schema, `db.py`, seed data with traps, collector, extraction with proof, consolidator, CLI and
-tests are done on `feat/ingest`. Run:
+tests are done on `feat/ingest` (PR #1). Design docs per feature: `docs/features/`. Run:
 
 ```bash
 uv sync
@@ -35,7 +35,7 @@ is re-verified against its PDF on every run.
 | Area | Functions |
 | --- | --- |
 | Connection | `connect(path=None, create=True)`, `init_db`, `migrate`, `transaction(conn)`, `reset_db_file`, `log_event`, `list_events` |
-| Values | `dec`, `dec_str`, `sha256_text`, `dumps`, `loads`, `row_to_dict`; constants `ACTIVITY_STATUSES`, `ALLOWED_TRANSITIONS`, `GAP_KINDS`, `GAP_STATUSES`, `DOC_KINDS`; exception `LedgerError` |
+| Values / ids | `dec`, `dec_str`, `sha256_text`, `dumps`, `loads`, `row_to_dict`, `make_doc_id`, `make_activity_id`, `make_instrument_id`; constants `ACTIVITY_STATUSES`, `ALLOWED_TRANSITIONS`, `GAP_KINDS`, `GAP_STATUSES`, `DOC_KINDS`; exception `LedgerError` |
 | Sites / periods | `upsert_site`, `get_site`, `list_sites`, `match_sites`, `ensure_period`, `get_period`, `list_periods`, `set_period_factor_set`, `close_period(conn, period, approved_by=, actor=)` |
 | Expected evidence | `upsert_expected_document`, `list_expected_documents`, `expected_but_missing(conn, period)` |
 | Documents | `add_source_doc`, `get_source_doc`, `get_source_doc_by_sha`, `find_source_docs_by_ref`, `list_source_docs`, `update_source_doc_ref`, `mark_doc_superseded`, `current_doc` |
@@ -55,7 +55,7 @@ through `supersede_activity`, and it is final. `FLAGGED` and `EXCLUDED` need a r
 ```text
 original_quantity, original_unit, conversion   e.g. "14.62", "MWh", "MWh x 1000 = kWh"
 doc_ref                                         e.g. "INV-204B"
-proposer                                        "cache:rules-v1" | "llm:nvidia:<model>" | "rules-v1"
+proposer                                        "cache:llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b" | "llm:<provider>:<model>" | "rules-v1"
 evidence{site, period, doc_ref, <field>}        each {excerpt, locator, excerpt_sha256}
 unverified_fields                               fields the document did not prove (each also has a gap)
 diesel:        delivery_ref ("DLV-7731"), delivery_date
@@ -102,7 +102,7 @@ Output (`cr.ingest.v1`, one result per file; `status` is `new` or `duplicate`):
 
 ```json
 {"file": "...", "sha256": "...", "status": "new", "doc_id": "DOC-73de8c54aefa", "kind": "utility_bill",
- "doc_ref": "ELB-RNO-2610", "proposer": "cache:rules-v1", "site": "reno", "period": "2026-10",
+ "doc_ref": "ELB-RNO-2610", "proposer": "cache:llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b", "site": "reno", "period": "2026-10",
  "received_from": "lena", "room": "cr-site-reno",
  "activities": [{"id": "ACT-dcfd7170bf", "category": "electricity", "quantity": "15080", "unit": "kWh",
                  "status": "UNVERIFIED", "excerpt": "Total energy used this period: 15.08 MWh",
