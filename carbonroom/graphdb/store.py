@@ -230,9 +230,15 @@ class Neo4jStore:
     @property
     def driver(self):
         if self._driver is None:
-            from neo4j import GraphDatabase
+            from neo4j import GraphDatabase, NotificationDisabledClassification
 
-            self._driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password), connection_timeout=5.0)
+            # A ledger with no gaps yet has no ABOUT / ABOUT_SITE links, so Neo4j would warn "relationship type
+            # does not exist" on every why query. Normal, not a typo (test_graphdb checks every query uses only
+            # link names the views produce), so those notices are switched off; real errors still raise.
+            self._driver = GraphDatabase.driver(
+                self.uri, auth=(self.user, self.password), connection_timeout=5.0,
+                notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
+            )
         return self._driver
 
     def close(self) -> None:

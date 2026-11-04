@@ -187,9 +187,12 @@ GAP-012 missing_doc: … Still missing: electricity (owner @lena)."
 
 **Verification:** these Cypher queries need a live server, so `carbonroom graphdb selftest` syncs the current
 ledger and runs every one. It checks node, link and number-to-bill counts against the views, a why for every site
-and month, the conflicts the ledger implies, and the read-only guard. Built and unit-tested 2026-11-04 without a
-live Neo4j (the build environment couldn't pull the image). **Run `carbonroom graphdb selftest` once with Docker and
-record the result in `docs/STATUS.md`.**
+and month, the conflicts the ledger implies, and the read-only guard. Ran 2026-11-04 against Neo4j Community
+2026.07.1 (Docker, macOS) on the seed: **14/14 passed**. Re-run it after changing any Cypher.
+
+Neo4j's "relationship type does not exist" notices are switched off in the driver: a ledger with no gaps yet (like
+the seed) has no `ABOUT` / `ABOUT_SITE` links, so every `why` would print one. Typos are caught by the tests instead
+(every query may only use link names the views produce).
 
 In Neo4j Browser (http://localhost:7474), for the demo:
 
@@ -203,7 +206,8 @@ MATCH p = (g:Gap)-[:ABOUT|OWNED_BY|ABOUT_SITE]->() RETURN p
 
 See `docs/DECISIONS.md`: graph as SQL views (no duplicate storage, never stale); recursive-CTE traversal with hub
 stopping; gap `refs_json` keys as the way to link gaps to rows; `graph_version` for view changes; Neo4j as a mirrored
-graph database (one model, rebuilt per sync in one transaction, auto-synced after writes).
+graph database (one model, rebuilt per sync in one transaction, auto-synced after writes); unknown-link notices
+switched off in the driver (needs driver 6.x, where that setting is stable).
 
 ## Code map
 

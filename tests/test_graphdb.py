@@ -163,6 +163,17 @@ def test_store_writes_in_one_transaction_and_reads_routed_read(full):
     assert driver.reads[-1][2] == RoutingControl.READ
 
 
+def test_driver_silences_unknown_link_notices(monkeypatch):
+    # An empty ledger has no gap links yet; Neo4j must not print "relationship type does not exist" on every query.
+    import neo4j
+
+    seen = {}
+    monkeypatch.setattr(neo4j.GraphDatabase, "driver", lambda uri, **kw: seen.update(kw, uri=uri) or "drv")
+    assert store.Neo4jStore(uri="bolt://x:7687").driver == "drv"
+    assert seen["notifications_disabled_classifications"] == [neo4j.NotificationDisabledClassification.UNRECOGNIZED]
+    assert seen["connection_timeout"] == 5.0
+
+
 def test_sync_if_enabled_respects_the_mode(full, monkeypatch, capsys):
     calls = []
     monkeypatch.setattr(store, "sync", lambda conn, neo=None: calls.append(1) or {"nodes": 0})
