@@ -9,6 +9,7 @@ One file per shipped feature. Each one says **why** the feature exists, **how it
 | Seed data with demo traps | [seed-data.md](seed-data.md) | `carbonroom/ingest/seedgen.py`, `carbonroom/ingest/seed.py`, `data/seed/` |
 | Ingestion (collect → extract with proof → consolidate) | [ingestion.md](ingestion.md) | `carbonroom/ingest/` |
 | Model provider layer | [llm.md](llm.md) | `carbonroom/llm.py` |
+| Background batch run (orchestrator / LangGraph) | [batch-run.md](batch-run.md) | `carbonroom/ingest/batch.py` |
 
 Plain-language walkthrough for judges' questions: [../EXPLAIN_ingestion.md](../EXPLAIN_ingestion.md).
 API hand-off for teammates: [../HANDOFF.md](../HANDOFF.md). Decision log: [../DECISIONS.md](../DECISIONS.md).

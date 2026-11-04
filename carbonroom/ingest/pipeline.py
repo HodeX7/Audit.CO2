@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -24,6 +25,34 @@ def _summary(path: Path, inc: collector.Incoming, status: str, **rest: Any) -> d
             "room": inc.room, **rest}
 
 
+@dataclass
+class Prepared:
+    """Everything known about one file before touching the ledger (safe to build in a worker thread)."""
+
+    path: Path
+    inc: collector.Incoming
+    pages: list[str]
+    proposed: extract.Proposed
+
+
+def prepare(inc: collector.Incoming, *, proposer: str | None = None, refresh_cache: bool = False) -> Prepared:
+    """Read page text and get a proposal (cache / model / rules). No ledger access, so it can run in parallel;
+    the model call happens here, outside any write lock."""
+    pages = extract.read_pages(inc.path)
+    mode = proposer or config.env("CR_PROPOSER", "auto")
+    if pages and any(p.strip() for p in pages):
+        proposed = extract.propose(inc.path, pages, inc.sha256, mode=mode, refresh=refresh_cache)
+    else:
+        proposed = extract.Proposed({}, "none", False, ["no readable text"])
+    return Prepared(inc.path, inc, pages, proposed)
+
+
+def _duplicate(conn: sqlite3.Connection, path: Path, inc: collector.Incoming, existing: dict) -> dict[str, Any]:
+    db.log_event(conn, ACTOR, "duplicate_skipped", existing["id"], {"file": str(path)})
+    return _summary(path, inc, "duplicate", doc_id=existing["id"], kind=existing["kind"],
+                    doc_ref=existing["doc_ref"], activities=[], instruments=[], gaps=[], supersedes=[])
+
+
 def ingest_file(
     conn: sqlite3.Connection,
     path: str | Path,
@@ -37,18 +66,17 @@ def ingest_file(
     path = Path(path)
     inc = collector.describe(path, received_from=received_from, room=room, meta=meta)
     existing = db.get_source_doc_by_sha(conn, inc.sha256)
-    if existing:
-        db.log_event(conn, ACTOR, "duplicate_skipped", existing["id"], {"file": str(path)})
-        return _summary(path, inc, "duplicate", doc_id=existing["id"], kind=existing["kind"],
-                        doc_ref=existing["doc_ref"], activities=[], instruments=[], gaps=[], supersedes=[])
+    if existing:  # checked before proposing, so a duplicate never costs a model call
+        return _duplicate(conn, path, inc, existing)
+    return commit(conn, prepare(inc, proposer=proposer, refresh_cache=refresh_cache))
 
-    # Read and propose OUTSIDE the write transaction (an LLM call can take seconds).
-    pages = extract.read_pages(path)
-    mode = proposer or config.env("CR_PROPOSER", "auto")
-    if pages and any(p.strip() for p in pages):
-        proposed = extract.propose(path, pages, inc.sha256, mode=mode, refresh=refresh_cache)
-    else:
-        proposed = extract.Proposed({}, "none", False, ["no readable text"])
+
+def commit(conn: sqlite3.Connection, prep: Prepared) -> dict[str, Any]:
+    """Verify a prepared file against its own text and write it to the ledger (main thread only)."""
+    path, inc, pages, proposed = prep.path, prep.inc, prep.pages, prep.proposed
+    existing = db.get_source_doc_by_sha(conn, inc.sha256)
+    if existing:
+        return _duplicate(conn, path, inc, existing)
     ex = extract.verify(proposed.proposal, pages, extract.site_matcher_for(conn), proposed.proposer)
 
     rules_kind = rules.classify(pages) if pages else "other"

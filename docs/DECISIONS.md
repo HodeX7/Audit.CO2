@@ -34,6 +34,8 @@ One line each: decision, why, date. Newest at the bottom of each owner's section
 
 - Model-agnostic LLM layer: presets nvidia, anthropic, openai, openrouter, ollama (local, no key) and openai_compatible (any server via `LLM_BASE_URL`); every setting can be overridden per task (`LLM_<FIELD>_<TASK>`, e.g. `LLM_MODEL_EXTRACT`); non-OpenAI SDKs plug in via `register_provider(client_factory=...)`; no default model anywhere (Anthropic's default removed too). Why: the team wants agents that work with any model, and verification by code makes swapping models safe. 2026-11-03
 
+- Background batch run for the orchestrator: prepare (read + propose) in parallel threads with no ledger access, then commit in sorted-path order on the main thread, so ids and GAP numbers don't depend on worker count; one failing file is isolated (`errors`, `ingest_error` event) and nothing half-written remains; the `cr.batch.v1` summary (with a ready-to-post `summary_text`) is stored in the append-only `batch_finished` event, not a new table; `collect_node(state)` is LangGraph-ready without importing LangGraph (the orchestrator is a teammate's). 2026-11-04
+
 ## Richa (Calculation, Checker & Report)
 
 ## Akshar (Switch Room, Demo & Submission)

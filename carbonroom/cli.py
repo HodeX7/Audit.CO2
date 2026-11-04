@@ -124,6 +124,8 @@ def cmd_ingest(args) -> int:
         if not args.paths:
             print("give a file or folder, or use --watch", file=sys.stderr)
             return 2
+        if args.workers > 1 or args.summary or args.run_id or args.period:
+            return _ingest_batch(conn, args, meta)
         results = pipeline.ingest_paths(
             conn, args.paths, received_from=args.sender, room=args.room, meta=meta or None,
             proposer=args.proposer, refresh_cache=args.refresh_cache, move_processed=args.move_processed,
@@ -137,6 +139,58 @@ def cmd_ingest(args) -> int:
     else:
         for r in results:
             _print_result(r)
+    return 0
+
+
+def _ingest_batch(conn, args, meta) -> int:
+    """Background batch run: parallel, one final summary (see docs/features/batch-run.md)."""
+    from carbonroom.ingest import batch
+
+    summary = batch.run_batch(
+        conn, args.paths, workers=args.workers, received_from=args.sender, room=args.room, meta=meta or None,
+        proposer=args.proposer, refresh_cache=args.refresh_cache, run_id=args.run_id,
+        periods=[args.period] if args.period else None,
+    )
+    if args.summary:
+        summary.pop("results", None)
+        if args.json:
+            _print_json(summary)
+        else:
+            print(f"{summary['run_id']}: {summary['summary_text']}")
+            for err in summary["errors"]:
+                print(f"  failed: {err['file']}: {err['error']}")
+        return 0
+    if args.json:
+        results = summary.pop("results")
+        _print_json({"type": "cr.ingest.v1", "results": results, "summary": summary})
+    else:
+        for r in summary["results"]:
+            _print_result(r)
+        print(f"\n{summary['run_id']}: {summary['summary_text']}")
+    return 0
+
+
+def cmd_ledger_runs(args) -> int:
+    from carbonroom.ingest import batch
+
+    conn = _connect(args)
+    data = batch.get_run(conn, args.id) if args.id else batch.list_runs(conn, limit=args.limit)
+    conn.close()
+    if args.id and data is None:
+        print(f"no finished run {args.id}", file=sys.stderr)
+        return 1
+    if args.json:
+        _print_json(data)
+    elif args.id:
+        print(f"{data['run_id']} ({data['finished_at']}, {data['seconds']}s, {data['workers']} workers)")
+        print(data["summary_text"])
+        for err in data.get("errors") or []:
+            print(f"  failed: {err['file']}: {err['error']}")
+    else:
+        for run in data:
+            print(f"{run['run_id']}  {run['finished_at']}  {run['summary_text']}")
+        if not data:
+            print("no runs yet")
     return 0
 
 
@@ -518,6 +572,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--watch", action="store_true", help="keep polling the inbox")
     p.add_argument("--interval", type=float, default=3.0)
     p.add_argument("--keep", action="store_true", help="with --watch: leave files in place")
+    p.add_argument("--workers", type=int, default=1, help="background batch: files prepared in parallel")
+    p.add_argument("--summary", action="store_true", help="background batch: print only the final summary")
+    p.add_argument("--run-id", help="background batch: id to record (default: generated RUN-...)")
+    p.add_argument("--period", help="background batch: also report missing evidence for this YYYY-MM")
     p.add_argument("--json", action="store_true", help="machine-readable output (for agents)")
     p.set_defaults(func=cmd_ingest)
 
@@ -553,6 +611,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--period", required=True)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_ledger_missing)
+    p = ledger.add_parser("runs", help="past background batch runs and their final summaries")
+    p.add_argument("--id", help="one run's summary")
+    p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_ledger_runs)
     p = ledger.add_parser("verify", help="re-hash every document and re-find every excerpt")
     p.add_argument("--period")
     p.add_argument("--verbose", "-v", action="store_true")

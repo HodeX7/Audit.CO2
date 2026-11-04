@@ -88,6 +88,18 @@ carbonroom ingest /tmp/upload/reno-oct.pdf --from lena --room cr-site-reno \
   --thread <thread_id> --message <message_id> --gap GAP-012 --json
 ```
 
+**Option C (for the orchestrator): a background batch run.** Many files, read in parallel, one final summary
+to post. Nothing goes to chat until it finishes:
+
+```bash
+carbonroom ingest data/inbox --workers 4 --summary --json --run-id RUN-oct-close --period 2026-10
+```
+
+Post `summary_text` from the `cr.batch.v1` output. From Python or LangGraph, call
+`carbonroom.ingest.batch.collect_node({"files": [...], "run_id": ..., "workers": 4})`, which returns
+`{"ingest_summaries": [summary]}` (merge parallel branches with `operator.add`). Past runs: `carbonroom ledger runs`.
+Details: `docs/features/batch-run.md`.
+
 **Option B: the watch folder.** Drop the file at `data/inbox/<room>/<file>` with an optional sidecar
 `data/inbox/<room>/<file>.meta.json`:
 

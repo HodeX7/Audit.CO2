@@ -139,7 +139,7 @@ supersede without touching the old row; content-addressed store; inbox + CLI han
 | `carbonroom.ingest.units.normalize` | canonical units, original kept |
 | `carbonroom.ingest.rules.propose` | keyless label-pattern proposer |
 | `carbonroom.ingest.consolidator.consolidate` | rows, supersede links, gaps |
-| `carbonroom.ingest.pipeline.ingest_file` | one file end to end; returns `cr.ingest.v1` |
+| `carbonroom.ingest.pipeline.ingest_file` | one file end to end (`prepare` + `commit`); returns `cr.ingest.v1` |
 | `carbonroom.ingest.pipeline.watch` | poll `data/inbox/` |
 | `carbonroom.ingest.evidence.evidence_status` | read-only re-check of one activity, for the checker |
 
@@ -150,6 +150,9 @@ supersede without touching the old row; content-addressed store; inbox + CLI han
 | `carbonroom ingest PATH...` | `--from` sender handle, `--room`, `--thread`, `--message`, `--gap` (kept in the document's meta), `--proposer auto\|rules\|llm`, `--refresh-cache`, `--move-processed` (move inbox files to `_processed/`), `--json` |
 | `carbonroom ingest --watch` | `--interval` seconds (default 3), `--keep` (leave files in place instead of moving them), `--json` |
 | `carbonroom extract PATH...` | dry run, no ledger writes: `--proposer`, `--refresh-cache`, `--json` |
+
+Many files at once, in the background, with one final summary: `--workers`, `--summary`, `--run-id`, `--period`
+(see [batch-run.md](batch-run.md)).
 
 ## Tests
 
