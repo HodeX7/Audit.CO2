@@ -1,1 +1,79 @@
-"""P1 collection orchestration (incrementally wired into the frozen core facade)."""
+"""P1 collection orchestration: source evidence first, claims always unverified."""
+
+from __future__ import annotations
+
+import re
+import sqlite3
+from decimal import Decimal
+from pathlib import Path
+
+from carbon_room import config
+from carbon_room.ledger import ledger
+from carbon_room.ledger.ids import next_id
+from carbon_room.models import Actor, Claim, IngestReport, Source
+from carbon_room.sources import cloud
+from carbon_room.sources.period import parse_period
+from carbon_room.sources.readers import read
+from carbon_room.sources.store import store_file
+from carbon_room.sources.validate import validate
+
+
+def _site_for(path: Path, explicit_site: str | None) -> str:
+    if explicit_site:
+        config.site(explicit_site)
+        return explicit_site
+    haystack = path.name.lower().replace("_", "-")
+    for entry in config.load_sites()["sites"]:
+        if entry["id"] in haystack or entry["name"].lower().replace(" ", "-") in haystack:
+            return entry["id"]
+    raise ValueError(f"could not infer a configured site from {path.name}; provide site=")
+
+
+def _candidate(pages: list[str]) -> dict | None:
+    text = "\n".join(pages)
+    match = re.search(r"([^\n]*?)(\d[\d,]*(?:\.\d+)?)\s*(kWh|L)\b", text, re.I)
+    if not match:
+        return None
+    unit = match.group(3)
+    return {"activity": "electricity_kwh" if unit.lower() == "kwh" else "diesel_l", "value": match.group(2).replace(",", ""),
+            "unit": unit, "excerpt": match.group(0), "page": 0, "attributes": {}}
+
+
+def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None) -> list[str]:
+    """Store, read and record one source; source text, not a model, is the proof boundary."""
+    close = ledger.get_close(conn, close_id)
+    source_path = Path(path)
+    resolved_site = _site_for(source_path, site)
+    if resolved_site not in close["sites"]:
+        raise ValueError(f"{resolved_site} is outside the close boundary")
+    kind, result = read(source_path)
+    pages = result if isinstance(result, list) else []
+    stored_path, digest = store_file(source_path)
+    source_id = next_id(conn, "SRC")
+    period = parse_period("\n".join(pages)) if pages else None
+    source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
+                    period[0] if period else None, period[1] if period else None, "OK" if pages else "FAILED", result if isinstance(result, str) else None)
+    ledger.add_source(conn, source, actor)
+    candidate = cloud.extract(source_path) if kind == "cloud_invoice" and pages else _candidate(pages)
+    if candidate is None or not pages or (kind != "cloud_invoice" and not validate(candidate, pages)[0]):
+        return []
+    claim = Claim(next_id(conn, "CL"), close_id, resolved_site, close["month"], candidate["activity"], Decimal(str(candidate["value"])),
+                  candidate["unit"], "DC" if candidate["activity"] == "dc_it_kwh" else "2", source_id, candidate["excerpt"], digest,
+                  candidate["page"], None, None, "UNVERIFIED", actor.id, None, None, candidate.get("attributes", {}))
+    return [ledger.add_claim(conn, claim, actor)]
+
+
+def ingest(conn: sqlite3.Connection, close_id: str, actor: Actor) -> IngestReport:
+    """Collect close-month and prior-month folders; the claim month deliberately follows the close folder."""
+    close = ledger.get_close(conn, close_id)
+    previous = f"{int(close['month'][:4]) - (close['month'].endswith('-01')):04d}-{(int(close['month'][5:]) - 2) % 12 + 1:02d}"
+    files = [file for month in (close["month"], previous) for file in sorted((Path("data/seed") / month).glob("*")) if file.is_file()]
+    claims, failures = [], []
+    for file in files:
+        try:
+            claims.extend(ingest_file(conn, close_id, file, actor))
+        except (OSError, ValueError, sqlite3.IntegrityError) as exc:
+            failures.append(f"{file.name}: {exc}")
+    ledger.set_phase(conn, close_id, "COLLECTING", actor)
+    current = sum(1 for file in files if file.parent.name == close["month"])
+    return IngestReport(close_id, len(files), claims, failures, f"All {current} {close['month']} sources collected.")

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from carbon_room import config
+from carbon_room.ledger import connect
+from carbon_room.ledger import budget, ledger
+from carbon_room.ledger.audit import verify_audit as verify_chain
+from carbon_room.models import Actor
 
 def _unimplemented(owner: str, story: str) -> None:
     raise NotImplementedError(f"owner: {owner}, story {story}")
@@ -9,17 +14,33 @@ def _unimplemented(owner: str, story: str) -> None:
 
 def start_close(month, sites, factor_set, actor, chat_message_id):
     """P1 implementation: create a close and lock its factor set."""
-    _unimplemented("P1", "P1-8.1")
+    if len(month) != 7 or month[4] != "-":
+        raise ValueError("month must use YYYY-MM")
+    boundary = list(sites)
+    for site_id in boundary:
+        config.site(site_id)
+    with connect() as db:
+        return ledger.create_close(db, month, boundary, factor_set, actor, chat_message_id)
 
 
 def ingest(close_id, actor):
     """P1 implementation: collect close and baseline source documents."""
-    _unimplemented("P1", "P1-8.2")
+    from carbon_room import collect
+
+    with connect() as db:
+        return collect.ingest(db, close_id, actor)
 
 
 def ingest_file(close_id, path, actor, chat_message_id, site=None):
     """P1 implementation: ingest one human-uploaded source."""
-    _unimplemented("P1", "P1-8.2")
+    from carbon_room import collect
+    from carbon_room.models import NeedsRoomEvent
+
+    if actor.kind == "human" and not chat_message_id:
+        raise NeedsRoomEvent("human uploads require a Switch chat_message_id")
+    with connect() as db:
+        claim_ids = collect.ingest_file(db, close_id, path, actor, site=site)
+        return claim_ids
 
 
 def calculate(close_id):
@@ -59,34 +80,45 @@ def trace(close_id, tag):
 
 def verify_audit(close_id):
     """P1 implementation: verify the close's hash chain."""
-    _unimplemented("P1", "P1-3.2")
+    with connect() as db:
+        return verify_chain(db, close_id)
 
 
 def resume_state(close_id):
     """P1 implementation: return phase and open gaps after a crash."""
-    _unimplemented("P1", "P1-8.4")
+    with connect() as db:
+        return ledger.get_close(db, close_id)["phase"], ledger.get_gaps(db, close_id, status="OPEN")
 
 
 def latest_close():
     """P1 implementation: return the most recent close identifier, if any."""
-    _unimplemented("P1", "P1-2.1")
+    with connect() as db:
+        return ledger.latest_close(db)
 
 
 def gap_for_thread(thread_root_message_id):
     """P1 implementation: map a Switch thread root to its gap."""
-    _unimplemented("P1", "P1-2.5")
+    with connect() as db:
+        return ledger.get_gap_by_thread(db, thread_root_message_id)
 
 
 def record_gap_thread(close_id, gap_id, message_id):
     """P1 implementation: persist the root message for a gap."""
-    _unimplemented("P1", "P1-2.5")
+    with connect() as db:
+        return ledger.set_gap_thread(db, close_id, gap_id, message_id)
 
 
 def budget_usage(close_id):
     """P1 implementation: expose per-agent close-level token usage."""
-    _unimplemented("P1", "P1-4.2")
+    with connect() as db:
+        return budget.usage(db, close_id)
 
 
 def explain(close_id, question, actor):
     """P1 implementation: phrase only verified ledger facts or UNKNOWN."""
-    _unimplemented("P1", "P1-8.5")
+    with connect() as db:
+        claims = [claim for claim in ledger.get_claims(db, close_id) if claim.status == "VERIFIED"]
+    if not claims:
+        return "UNKNOWN for this close, because no VERIFIED ledger rows match, owned by lead"
+    facts = "; ".join(f"{claim.site}: {claim.value} {claim.unit} ({claim.activity})" for claim in claims)
+    return f"Verified ledger facts: {facts}"

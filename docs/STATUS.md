@@ -6,7 +6,8 @@ Each owner updates their own section: done / next / blocked.
 
 **Current P1 integration**
 - Contract-compliance migration: shared types, frozen facade signatures, sites configuration and the independent
-  SQLite schema are implemented and tested. Next: contract ledger operations and audit chain.
+  SQLite schema are implemented and tested. Contract ledger operations, audit chain, source foundations, and the
+  P1 room-facing facade are now wired; next: replay extraction, contract seed scenario, and CLI.
 - Room-resume helpers and single-file room ingestion are implemented in `core.py`, including an audit-linked human `chat_message_id`.
 
 **Done**

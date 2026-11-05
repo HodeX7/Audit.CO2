@@ -11,7 +11,8 @@ continues to work during migration, while the contract-compatible package gives 
 
 `carbon_room.models` defines the frozen dataclasses, literals, and typed errors from contract section 2. `to_dict`
 and `from_dict` make the dataclasses JSON-ready without converting Decimal values through float. The package also
-adds the separate contract schema, site-boundary configuration, and exact room-facing facade signatures.
+adds the separate contract schema, site-boundary configuration, exact room-facing facade signatures, and P1
+collection operations. P2's calculation, checks, and reporting methods remain explicit integration seams.
 
 ## Decisions
 
@@ -26,6 +27,7 @@ The package-alignment proposal is `docs/proposals/001-contract-package-alignment
 | `carbon_room/ledger/schema.sql`, `carbon_room/ledger/__init__.py` | Contract SQLite schema and connection defaults |
 | `carbon_room/config.py`, `config/sites.yaml` | Cached P1 site boundary and expected-source lookup |
 | `carbon_room/core.py` | Frozen facade signatures; P2 behavior remains explicitly unimplemented |
+| `carbon_room/collect.py`, `carbon_room/sources/` | P1 source ingestion, storage, readers and deterministic cloud mapping |
 | `tests/test_contract_models.py`, `tests/test_schema.py`, `tests/test_config.py`, `tests/test_core_signatures.py` | Compatibility proof tests |
 
 ## Tests
