@@ -9,9 +9,10 @@ from pathlib import Path
 
 from carbon_room import config
 from carbon_room.ledger import ledger
+from carbon_room.ledger.audit import append_event
 from carbon_room.ledger.ids import next_id
 from carbon_room.ledger.locks import claim_lock
-from carbon_room.models import Actor, Claim, IngestReport, Source
+from carbon_room.models import Actor, Claim, IngestReport, LockHeld, NeedsRoomEvent, Source
 from carbon_room.sources import cache
 from carbon_room.sources import cloud
 from carbon_room.sources import extract as model_extract
@@ -51,14 +52,15 @@ def _mode() -> str:
         return "rules"
 
 
-def _candidates(pages: list[str], kind: str, file_name: str, digest: str, close_id: str) -> list[dict]:
+def _candidates(pages: list[str], kind: str, file_name: str, digest: str, close_id: str,
+                conn: sqlite3.Connection) -> list[dict]:
     if kind == "cloud_invoice":
         return []
     mode = _mode()
     if mode == "replay":
         return cache.load(digest)
     if mode == "live":
-        candidates = model_extract.extract(pages, kind, file_name, close_id=close_id)
+        candidates = model_extract.extract(pages, kind, file_name, close_id=close_id, conn=conn)
         cache.save(digest, candidates)
         return candidates
     candidate = _candidate(pages)
@@ -66,8 +68,10 @@ def _candidates(pages: list[str], kind: str, file_name: str, digest: str, close_
 
 
 def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None,
-                month_from_period: bool = False) -> list[str]:
+                month_from_period: bool = False, chat_message_id: str | None = None) -> list[str]:
     """Store, read and record one source; source text, not a model, is the proof boundary."""
+    if actor.kind == "human" and not chat_message_id:
+        raise NeedsRoomEvent("human uploads require a Switch chat_message_id")
     close = ledger.get_close(conn, close_id)
     source_path = Path(path)
     resolved_site = _site_for(source_path, site)
@@ -76,13 +80,22 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
     kind, result = read(source_path)
     pages = result if isinstance(result, list) else []
     stored_path, digest = store_file(source_path)
-    source_id = next_id(conn, "SRC")
-    period = parse_period("\n".join(pages)) if pages else None
-    source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
-                    period[0] if period else None, period[1] if period else None, "OK" if pages else "FAILED", result if isinstance(result, str) else None)
-    with claim_lock(conn, close_id, resolved_site, close["month"], source_id, actor.id):
-        ledger.add_source(conn, source, actor)
-        candidates = [cloud.extract(source_path)] if kind == "cloud_invoice" and pages else _candidates(pages, kind, source_path.name, digest, close_id)
+    with claim_lock(conn, close_id, resolved_site, close["month"], digest, actor.id):
+        if ledger.source_for_sha(conn, close_id, digest) is not None:
+            if chat_message_id:
+                append_event(
+                    conn, close_id, actor, "room_file_ingested", chat_message_id=chat_message_id,
+                    payload={"claim_ids": [], "path": str(path), "duplicate": True},
+                )
+            return []
+        source_id = next_id(conn, "SRC")
+        period = parse_period("\n".join(pages)) if pages else None
+        source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
+                        period[0] if period else None, period[1] if period else None, "OK" if pages else "FAILED", result if isinstance(result, str) else None)
+        ledger.add_source(conn, source, actor, chat_message_id)
+        candidates = [cloud.extract(source_path)] if kind == "cloud_invoice" and pages else _candidates(
+            pages, kind, source_path.name, digest, close_id, conn
+        )
         valid = [candidate for candidate in candidates if kind == "cloud_invoice" or validate(candidate, pages)[0]]
         claim_month = period[0][:7] if month_from_period and period else close["month"]
         claim_ids = []
@@ -90,7 +103,12 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
             claim = Claim(next_id(conn, "CL"), close_id, resolved_site, claim_month, candidate["activity"], Decimal(str(candidate["value"])),
                           candidate["unit"], "DC" if candidate["activity"] == "dc_it_kwh" else "2", source_id, candidate["excerpt"], digest,
                           candidate["page"], None, None, "UNVERIFIED", actor.id, None, None, candidate.get("attributes", {}))
-            claim_ids.append(ledger.add_claim(conn, claim, actor))
+            claim_ids.append(ledger.add_claim(conn, claim, actor, chat_message_id))
+        if chat_message_id:
+            append_event(
+                conn, close_id, actor, "room_file_ingested", chat_message_id=chat_message_id,
+                payload={"claim_ids": claim_ids, "path": str(path)},
+            )
         return claim_ids
 
 
@@ -103,8 +121,10 @@ def ingest(conn: sqlite3.Connection, close_id: str, actor: Actor) -> IngestRepor
     for file in files:
         try:
             claims.extend(ingest_file(conn, close_id, file, actor))
-        except (OSError, ValueError, sqlite3.IntegrityError) as exc:
+        except (LockHeld, OSError, ValueError, sqlite3.IntegrityError) as exc:
             failures.append(f"{file.name}: {exc}")
     ledger.set_phase(conn, close_id, "COLLECTING", actor)
+    # Keep the next ingestion invocation eligible to publish its own lease.
+    conn.commit()
     current = sum(1 for file in files if file.parent.name == close["month"])
     return IngestReport(close_id, len(files), claims, failures, f"All {current} {close['month']} sources collected.")

@@ -14,10 +14,11 @@ def connect(path: str | Path = DEFAULT_PATH) -> sqlite3.Connection:
     """Open a contract ledger with SQLite's required safety pragmas enabled."""
     database = Path(path)
     database.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(database)
+    conn = sqlite3.connect(database, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 

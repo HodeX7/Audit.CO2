@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import sqlite3
 
 import pytest
 
 from carbon_room.ledger import ledger
 from carbon_room.ledger.audit import verify_audit
-from carbon_room.models import Actor, Claim, NeedsRoomEvent, NotAllowed, Source
+from carbon_room.models import Actor, Calculation, Claim, Finding, NeedsRoomEvent, NotAllowed, Source
 
 
 SYSTEM = Actor("system", "seed", "Seed")
@@ -46,3 +47,68 @@ def test_claim_is_forced_unverified_and_status_guardrails_hold(db):
         ledger.set_status(db, claim_id, "MISSING", SYSTEM, "not a status")
     ledger.set_status(db, claim_id, "VERIFIED", Actor("agent", "watchdog", "Watchdog"), "all rules passed")
     assert ledger.get_claim(db, claim_id).status == "VERIFIED"
+
+
+def test_ledger_rejects_unknown_contract_states_and_event_rewrites(db):
+    close_id = _close(db)
+    with pytest.raises(ValueError, match="unknown close phase"):
+        ledger.set_phase(db, close_id, "DONE", SYSTEM)
+    claim_id = ledger.add_claim(db, _claim(db, close_id), SYSTEM)
+    with pytest.raises(ValueError, match="unknown claim status"):
+        ledger.set_status(db, claim_id, "PENDING", SYSTEM, "not a contract status")
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        db.execute("UPDATE events SET reason='rewritten' WHERE close_id=?", (close_id,))
+    db.execute("DROP TRIGGER events_are_append_only_update")
+    first_event = db.execute("SELECT event_id FROM events WHERE close_id=? ORDER BY event_id LIMIT 1", (close_id,)).fetchone()
+    db.execute("UPDATE events SET reason='tampered' WHERE event_id=?", (first_event["event_id"],))
+    audit = verify_audit(db, close_id)
+    assert not audit.ok
+    assert audit.first_bad_event_id == first_event["event_id"]
+
+
+def test_source_tags_remain_unique_when_calculations_arrive_in_batches(db):
+    close_id = _close(db)
+    claim_id = ledger.add_claim(db, _claim(db, close_id), SYSTEM)
+    ledger.load_factors(db, [{
+        "factor_id": "F-1", "source": "factor-source", "version": "v1", "year": "2026",
+        "activity": "electricity_kwh", "geography": "test", "value": Decimal("0.2"),
+        "unit": "kgCO2e/kWh", "citation": "test",
+    }])
+
+    def calculation(calc_id):
+        return Calculation(calc_id, claim_id, "F-1", "v1", Decimal("1"), "kWh", Decimal("0.2"),
+                           "kgCO2e/kWh", Decimal("0.2"), "1 * 0.2", "location")
+
+    first = ledger.add_calculation(db, calculation("CA-1"))
+    second = ledger.add_calculation(db, calculation("CA-2"))
+    assert ledger.assign_s_tags(db, close_id, 1, [first]) == {first: "S-001"}
+    assert ledger.assign_s_tags(db, close_id, 1, [first, second]) == {first: "S-001", second: "S-002"}
+    events_before_repeat = db.execute("SELECT COUNT(*) FROM events WHERE kind='s_tags_assigned'").fetchone()[0]
+    assert ledger.assign_s_tags(db, close_id, 1, [first, second]) == {first: "S-001", second: "S-002"}
+    assert db.execute("SELECT COUNT(*) FROM events WHERE kind='s_tags_assigned'").fetchone()[0] == events_before_repeat
+    other_close = ledger.create_close(db, "2026-11", ["test-site"], "FS-test", SYSTEM, "msg-close-2")
+    with pytest.raises(ValueError, match="does not belong"):
+        ledger.assign_s_tags(db, other_close, 1, [first])
+
+
+def test_gap_ids_restart_for_each_close_without_colliding_in_storage(db):
+    first_close = _close(db)
+    second_close = ledger.create_close(db, "2026-11", ["test-site"], "FS-test", SYSTEM, "msg-close-2")
+    finding = Finding("F-test", "R1", "MISSING", ["CL-first"], "test-site", "2026-10", "lead", "Missing", [], [], 1, True)
+    first_gap = ledger.upsert_gap(db, first_close, finding)
+    second_gap = ledger.upsert_gap(
+        db,
+        second_close,
+        Finding("F-test", "R1", "MISSING", ["CL-second"], "test-site", "2026-11", "lead", "Missing", [], [], 1, True),
+    )
+    assert (first_gap.gap_id, second_gap.gap_id) == ("G-1", "G-1")
+    ledger.set_gap_thread(db, first_close, first_gap.gap_id, "thread-first")
+    assert ledger.get_gap(db, first_gap.gap_id, first_close).thread_root_message_id == "thread-first"
+    assert ledger.get_gap(db, second_gap.gap_id, second_close).thread_root_message_id is None
+    with pytest.raises(ValueError, match="already linked"):
+        ledger.set_gap_thread(db, second_close, second_gap.gap_id, "thread-first")
+    ledger.resolve_gap(db, first_close, first_gap.gap_id, SYSTEM, "resolve-first", {"action": "upload"})
+    assert ledger.get_gap(db, first_gap.gap_id, first_close).status == "RESOLVED"
+    assert ledger.get_gap(db, second_gap.gap_id, second_close).status == "OPEN"
+    edge_sources = {row["src"] for row in db.execute("SELECT src FROM edges WHERE rel='ABOUT'")}
+    assert edge_sources == {f"{first_close}:G-1", f"{second_close}:G-1"}

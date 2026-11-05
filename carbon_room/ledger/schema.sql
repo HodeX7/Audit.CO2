@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS closes (
     month TEXT NOT NULL,
     sites TEXT NOT NULL,
     factor_set TEXT NOT NULL,
-    phase TEXT NOT NULL,
+    phase TEXT NOT NULL CHECK (phase IN ('OPEN','COLLECTING','CALCULATING','CHECKING','AWAITING_HUMANS','RECHECKING','DRAFTED','PUBLISHED')),
     version INTEGER NOT NULL,
     created_by TEXT NOT NULL,
     created_message_id TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS claims (
     source_page INTEGER NOT NULL,
     factor_id TEXT,
     factor_version TEXT,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('VERIFIED','UNVERIFIED','CONFLICTING','STALE')),
     extracted_by TEXT NOT NULL,
     checked_by TEXT,
     superseded_by TEXT REFERENCES claims(claim_id),
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS calculations (
 );
 
 CREATE TABLE IF NOT EXISTS gaps (
-    gap_id TEXT PRIMARY KEY,
+    gap_id TEXT NOT NULL,
     close_id TEXT NOT NULL REFERENCES closes(close_id),
     finding_id TEXT NOT NULL,
     rule TEXT NOT NULL,
@@ -96,11 +96,12 @@ CREATE TABLE IF NOT EXISTS gaps (
     status TEXT NOT NULL,
     claim_ids TEXT NOT NULL,
     options TEXT NOT NULL,
-    thread_root_message_id TEXT,
+    thread_root_message_id TEXT UNIQUE,
     opened_at TEXT NOT NULL,
     resolved_by TEXT,
     resolved_message_id TEXT,
     resolution TEXT,
+    PRIMARY KEY(close_id, gap_id),
     UNIQUE(close_id, finding_id)
 );
 
@@ -138,7 +139,7 @@ CREATE TABLE IF NOT EXISTS locks (
     close_id TEXT NOT NULL REFERENCES closes(close_id),
     site TEXT NOT NULL,
     month TEXT NOT NULL,
-    source_doc_id TEXT NOT NULL,
+    source_doc_id TEXT NOT NULL, -- content key until the source row is allocated
     holder TEXT NOT NULL,
     acquired_at TEXT NOT NULL,
     PRIMARY KEY(close_id, site, month, source_doc_id)
@@ -161,10 +162,22 @@ CREATE TABLE IF NOT EXISTS s_tags (
     PRIMARY KEY(close_id, version, tag)
 );
 
+CREATE TRIGGER IF NOT EXISTS events_are_append_only_update
+BEFORE UPDATE ON events
+BEGIN
+    SELECT RAISE(ABORT, 'audit events are append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS events_are_append_only_delete
+BEFORE DELETE ON events
+BEGIN
+    SELECT RAISE(ABORT, 'audit events are append-only');
+END;
+
 CREATE VIEW IF NOT EXISTS edges AS
 SELECT site AS src, 'CONSUMED' AS rel, claim_id AS dst FROM claims
 UNION ALL SELECT claim_id, 'FROM', source_doc_id FROM claims
 UNION ALL SELECT claim_id, 'USES', factor_id FROM claims WHERE factor_id IS NOT NULL
 UNION ALL SELECT calc_id, 'OF', claim_id FROM calculations
-UNION ALL SELECT gap_id, 'ABOUT', value FROM gaps, json_each(gaps.claim_ids)
+UNION ALL SELECT close_id || ':' || gap_id, 'ABOUT', value FROM gaps, json_each(gaps.claim_ids)
 UNION ALL SELECT approval_id, 'APPROVES', subject_id FROM approvals;

@@ -18,6 +18,7 @@ carbonroom.db-shm
 var/
 out/
 data/store/
+data/cache/
 data/inbox/*
 !data/inbox/.gitkeep
 

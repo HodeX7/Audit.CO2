@@ -6,3 +6,13 @@
   it now eliminates duplicate APIs and schemas before integration begins. 2026-11-05
 - SQLite remains authoritative; quantities and factors are Decimal text. Why: reproducible calculations and audit
   evidence must not drift through floating point. 2026-11-05
+- P1 validates close phases and claim statuses in code and in fresh SQLite schemas. Why: callers receive clear
+  contract errors and new ledgers cannot persist invalid state. 2026-11-05
+- Audit events are append-only at the SQLite layer. Why: hash verification detects tampering, while database
+  triggers prevent accidental in-place rewrites in normal application use. 2026-11-05
+- P1's live extraction budget is charged through the caller's ledger connection. Why: a close must never be charged
+  against an unrelated default database during tests, demos, or worker execution. 2026-11-05
+- Ingestion reserves a source SHA-256 with `BEGIN IMMEDIATE` before allocating a source id. The lease is published
+  before source writes, so a competing worker can read it in WAL mode and receive `LockHeld` rather than a database
+  lock error. `claim_lock` owns that transaction boundary; callers must enter it with no active transaction.
+  2026-11-05

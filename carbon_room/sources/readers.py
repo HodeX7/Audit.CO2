@@ -28,5 +28,5 @@ def read(path: str | Path) -> tuple[str, list[str] | str]:
         if suffix == ".json":
             return kind, [json.dumps(json.loads(file.read_text(encoding="utf-8")), sort_keys=True, indent=2)]
         return kind, [file.read_text(encoding="utf-8")]
-    except Exception as exc:  # input safety boundary
-        return kind, f"unreadable {file.name}: {exc}"
+    except Exception:  # input safety boundary; provider errors may include local details
+        return kind, f"unreadable {file.name}"

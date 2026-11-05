@@ -5,7 +5,7 @@ from __future__ import annotations
 from carbon_room import config
 from carbon_room.ledger import connect
 from carbon_room.ledger import budget, ledger
-from carbon_room.ledger.audit import append_event, verify_audit as verify_chain
+from carbon_room.ledger.audit import verify_audit as verify_chain
 from carbon_room.models import Actor
 
 def _unimplemented(owner: str, story: str) -> None:
@@ -39,10 +39,10 @@ def ingest_file(close_id, path, actor, chat_message_id, site=None):
     if actor.kind == "human" and not chat_message_id:
         raise NeedsRoomEvent("human uploads require a Switch chat_message_id")
     with connect() as db:
-        claim_ids = collect.ingest_file(db, close_id, path, actor, site=site, month_from_period=True)
-        append_event(db, close_id, actor, "room_file_ingested", chat_message_id=chat_message_id,
-                     payload={"claim_ids": claim_ids, "path": str(path)})
-        return claim_ids
+        return collect.ingest_file(
+            db, close_id, path, actor, site=site, month_from_period=True,
+            chat_message_id=chat_message_id,
+        )
 
 
 def calculate(close_id):
