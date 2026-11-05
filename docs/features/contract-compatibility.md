@@ -28,9 +28,11 @@ The package-alignment proposal is `docs/proposals/001-contract-package-alignment
 | `carbon_room/config.py`, `config/sites.yaml` | Cached P1 site boundary and expected-source lookup |
 | `carbon_room/core.py` | Frozen facade signatures; P2 behavior remains explicitly unimplemented |
 | `carbon_room/collect.py`, `carbon_room/sources/` | P1 source ingestion, storage, readers and deterministic cloud mapping |
+| `scripts/make_seed.py`, `data/seed/2026-09/`, `data/seed/2026-10/` | Deterministic synthetic contract scenario and documented traps |
 | `tests/test_contract_models.py`, `tests/test_schema.py`, `tests/test_config.py`, `tests/test_core_signatures.py` | Compatibility proof tests |
 
 ## Tests
 
 Focused compatibility tests prove Decimal round-trips, schema uniqueness and idempotence, environment-overrideable
-site configuration, and frozen function parameter names. The legacy suite also runs unchanged.
+site configuration, frozen function parameter names, repeat-safe seed ingestion, and human upload attribution. The
+legacy suite also runs unchanged.

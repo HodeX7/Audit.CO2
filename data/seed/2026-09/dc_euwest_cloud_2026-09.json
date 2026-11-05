@@ -1,0 +1,10 @@
+{
+  "it_energy_kwh": "12000",
+  "market_based_kgco2e": "0",
+  "period_end": "2026-09-30",
+  "period_start": "2026-09-01",
+  "pue": "1.2",
+  "region": "eu-west-1",
+  "sample": "SAMPLE \u2014 synthetic demo data \u2014 FICTIONAL DOCUMENT",
+  "vendor_factor_ref": "Ember 2025 IE"
+}

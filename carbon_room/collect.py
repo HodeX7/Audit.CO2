@@ -22,9 +22,10 @@ def _site_for(path: Path, explicit_site: str | None) -> str:
     if explicit_site:
         config.site(explicit_site)
         return explicit_site
-    haystack = path.name.lower().replace("_", "-")
+    haystack = re.sub(r"[^a-z0-9]", "", path.name.lower())
     for entry in config.load_sites()["sites"]:
-        if entry["id"] in haystack or entry["name"].lower().replace(" ", "-") in haystack:
+        identifiers = (entry["id"], entry["name"])
+        if any(re.sub(r"[^a-z0-9]", "", value.lower()) in haystack for value in identifiers):
             return entry["id"]
     raise ValueError(f"could not infer a configured site from {path.name}; provide site=")
 
@@ -39,7 +40,8 @@ def _candidate(pages: list[str]) -> dict | None:
             "unit": unit, "excerpt": match.group(0), "page": 0, "attributes": {}}
 
 
-def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None) -> list[str]:
+def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None,
+                month_from_period: bool = False) -> list[str]:
     """Store, read and record one source; source text, not a model, is the proof boundary."""
     close = ledger.get_close(conn, close_id)
     source_path = Path(path)
@@ -57,7 +59,8 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
     candidate = cloud.extract(source_path) if kind == "cloud_invoice" and pages else _candidate(pages)
     if candidate is None or not pages or (kind != "cloud_invoice" and not validate(candidate, pages)[0]):
         return []
-    claim = Claim(next_id(conn, "CL"), close_id, resolved_site, close["month"], candidate["activity"], Decimal(str(candidate["value"])),
+    claim_month = period[0][:7] if month_from_period and period else close["month"]
+    claim = Claim(next_id(conn, "CL"), close_id, resolved_site, claim_month, candidate["activity"], Decimal(str(candidate["value"])),
                   candidate["unit"], "DC" if candidate["activity"] == "dc_it_kwh" else "2", source_id, candidate["excerpt"], digest,
                   candidate["page"], None, None, "UNVERIFIED", actor.id, None, None, candidate.get("attributes", {}))
     return [ledger.add_claim(conn, claim, actor)]
