@@ -35,7 +35,7 @@ def full(seeded):
     diesel = db.list_activities(seeded, period_id="2026-10", category="diesel")
     gap, _ = db.create_gap(seeded, kind="conflict", detail="INV-204 vs INV-204B", created_by="cr-checker",
                            period_id="2026-10", site_id="austin", refs={"activity_ids": [a["id"] for a in diesel]})
-    db.resolve_gap(seeded, gap["id"], resolution="use INV-204B", resolved_by="omar")
+    db.resolve_gap(seeded, gap["id"], resolution="use INV-204B", resolved_by="omar", chat_message_id="mm-1")
     db.create_gap(seeded, kind="missing_doc", detail="no bill", created_by="cr-checker", period_id="2026-10",
                   site_id="reno")
     db.add_emission_factor(seeded, id="F-NWPP", set_version="v1", category="electricity", region="NWPP",
@@ -44,7 +44,8 @@ def full(seeded):
     reno = db.list_activities(seeded, period_id="2026-10", site_id="reno")[0]
     db.add_calculation(seeded, activity_id=reno["id"], factor_id="F-NWPP", scope="2_location", co2e_kg="1",
                        code_version="t")
-    db.record_approval(seeded, period_id="2026-10", approver_handle="grace", decision="REJECT", note="not yet")
+    db.record_approval(seeded, period_id="2026-10", approver_handle="grace", decision="REJECT", note="not yet",
+                       chat_message_id="mm-2")
     return seeded
 
 

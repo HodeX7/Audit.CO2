@@ -137,7 +137,9 @@ CREATE TABLE IF NOT EXISTS gaps (
   created_at   TEXT NOT NULL,                     -- additive
   created_by   TEXT NOT NULL,                     -- additive
   dedupe_key   TEXT UNIQUE,                       -- additive: stops the same gap being opened twice
-  refs_json    TEXT NOT NULL DEFAULT '{}'         -- additive: activity / doc ids the gap is about
+  refs_json    TEXT NOT NULL DEFAULT '{}',        -- additive: activity / doc ids the gap is about
+  finding_id   TEXT,                              -- additive: the Watchdog finding that opened it
+  resolved_message_id TEXT                        -- additive: the Switch message that resolved it (required)
 );
 
 CREATE TABLE IF NOT EXISTS approvals (
@@ -147,7 +149,29 @@ CREATE TABLE IF NOT EXISTS approvals (
   decision        TEXT NOT NULL CHECK (decision IN ('APPROVE','REJECT')),
   note            TEXT,
   report_sha256   TEXT,
-  at              TEXT NOT NULL
+  at              TEXT NOT NULL,
+  chat_message_id TEXT                            -- additive: the Switch message the decision came from (required)
+);
+
+-- Additive (architecture "Close" contract): one row per close of a month. Its boundary (sites) and factor
+-- set are locked when the close starts. `phase` is the close's state: the orchestrator's LangGraph state is
+-- only a cache, so after a crash it resumes from this row. A new version of a month is a new row.
+CREATE TABLE IF NOT EXISTS closes (
+  id                   TEXT PRIMARY KEY,          -- 'CLOSE-2026-10-v1'
+  period_id            TEXT NOT NULL REFERENCES periods(id),
+  version              INTEGER NOT NULL CHECK (version >= 1),
+  sites_json           TEXT NOT NULL,             -- the locked boundary, e.g. ["austin","nimbus-cloud","reno"]
+  factor_set           TEXT NOT NULL,             -- the locked factor set version
+  phase                TEXT NOT NULL DEFAULT 'OPEN' CHECK (phase IN ('OPEN','COLLECTING','CALCULATING',
+                         'CHECKING','AWAITING_HUMANS','RECHECKING','DRAFTED','PUBLISHED')),
+  started_by           TEXT NOT NULL,
+  started_message_id   TEXT,                      -- NULL = started outside the room (CLI, tests)
+  started_at           TEXT NOT NULL,
+  published_by         TEXT,
+  published_message_id TEXT,
+  published_at         TEXT,
+  report_sha256        TEXT,
+  UNIQUE (period_id, version)
 );
 
 -- Audit chain: every event carries the hash of the event before it, so editing, removing or
@@ -211,6 +235,8 @@ CREATE TRIGGER IF NOT EXISTS no_delete_events BEFORE DELETE ON events
 BEGIN SELECT RAISE(ABORT, 'carbonroom: rows are never deleted (supersede instead)'); END;
 CREATE TRIGGER IF NOT EXISTS no_delete_expected_documents BEFORE DELETE ON expected_documents
 BEGIN SELECT RAISE(ABORT, 'carbonroom: rows are never deleted (supersede instead)'); END;
+CREATE TRIGGER IF NOT EXISTS no_delete_closes BEFORE DELETE ON closes
+BEGIN SELECT RAISE(ABORT, 'carbonroom: rows are never deleted (supersede instead)'); END;
 
 -- The audit log and recorded approvals are append-only.
 CREATE TRIGGER IF NOT EXISTS events_append_only BEFORE UPDATE ON events
@@ -269,6 +295,49 @@ BEGIN SELECT RAISE(ABORT, 'carbonroom: events form a hash chain; write them with
 -- A recorded calculation is never rewritten; recompute by inserting a new row.
 CREATE TRIGGER IF NOT EXISTS calculations_append_only BEFORE UPDATE ON calculations
 BEGIN SELECT RAISE(ABORT, 'carbonroom: calculations are append-only (insert a new row)'); END;
+
+-- Switch is load-bearing: every human action carries the chat message it came from. Without the room
+-- there is no approval, no resolution and no publish; the CLI can only produce an unverified draft.
+CREATE TRIGGER IF NOT EXISTS approvals_need_room BEFORE INSERT ON approvals
+WHEN NEW.chat_message_id IS NULL OR trim(NEW.chat_message_id) = ''
+BEGIN SELECT RAISE(ABORT, 'carbonroom: an approval needs the Switch chat_message_id it came from'); END;
+
+CREATE TRIGGER IF NOT EXISTS gaps_resolution_needs_room
+BEFORE UPDATE OF status ON gaps
+WHEN NEW.status IN ('RESOLVED','ACCEPTED_RISK')
+  AND (NEW.resolved_message_id IS NULL OR trim(NEW.resolved_message_id) = '')
+BEGIN SELECT RAISE(ABORT, 'carbonroom: closing a gap needs the Switch chat_message_id of the reply'); END;
+
+-- A close's boundary and factor set are locked when it starts; a published close is final; one open close
+-- per month; publishing needs the publisher's chat message and their APPROVE (from the room) since the start.
+CREATE TRIGGER IF NOT EXISTS closes_lock_is_frozen
+BEFORE UPDATE OF period_id, version, sites_json, factor_set, started_by, started_message_id, started_at ON closes
+BEGIN SELECT RAISE(ABORT, 'carbonroom: a close''s boundary and factor set are locked (start a new version)'); END;
+
+CREATE TRIGGER IF NOT EXISTS closes_published_is_final BEFORE UPDATE ON closes
+WHEN OLD.phase = 'PUBLISHED'
+BEGIN SELECT RAISE(ABORT, 'carbonroom: a published close is final (start a new version)'); END;
+
+CREATE TRIGGER IF NOT EXISTS closes_one_open_per_month BEFORE INSERT ON closes
+WHEN EXISTS (SELECT 1 FROM closes c WHERE c.period_id = NEW.period_id AND c.phase != 'PUBLISHED')
+BEGIN SELECT RAISE(ABORT, 'carbonroom: this month already has an open close (resume it)'); END;
+
+CREATE TRIGGER IF NOT EXISTS closes_publish_needs_room
+BEFORE UPDATE OF phase ON closes
+WHEN NEW.phase = 'PUBLISHED' AND (
+  NEW.published_by IS NULL OR trim(NEW.published_by) = ''
+  OR NEW.published_message_id IS NULL OR trim(NEW.published_message_id) = ''
+  OR NOT EXISTS (SELECT 1 FROM approvals a
+                 WHERE a.period_id = NEW.period_id AND a.decision = 'APPROVE'
+                   AND a.approver_handle = NEW.published_by AND a.chat_message_id IS NOT NULL
+                   AND a.at >= NEW.started_at))
+BEGIN SELECT RAISE(ABORT, 'carbonroom: publishing needs the publisher''s chat message and their APPROVE from the room'); END;
+
+CREATE TRIGGER IF NOT EXISTS periods_factor_set_locked_by_close
+BEFORE UPDATE OF factor_set_version ON periods
+WHEN EXISTS (SELECT 1 FROM closes c WHERE c.period_id = NEW.id AND c.phase != 'PUBLISHED'
+             AND c.factor_set IS NOT NEW.factor_set_version)
+BEGIN SELECT RAISE(ABORT, 'carbonroom: the factor set is locked by this month''s open close'); END;
 
 -- Rule 2: a gap is never closed without a named human and a written resolution.
 CREATE TRIGGER IF NOT EXISTS gaps_resolution_needs_human
@@ -333,7 +402,12 @@ CREATE VIEW IF NOT EXISTS ledger_edges(src_type, src_id, rel, dst_type, dst_id, 
   UNION ALL SELECT 'expected', id, 'for_site', 'site', site_id, category FROM expected_documents
   UNION ALL SELECT 'approval', id, 'for_period', 'period', period_id, decision FROM approvals
   UNION ALL SELECT 'approval', id, 'by', 'person', approver_handle, note FROM approvals
-  UNION ALL SELECT 'period', id, 'approved_by', 'person', approved_by, closed_at FROM periods WHERE approved_by IS NOT NULL;
+  UNION ALL SELECT 'period', id, 'approved_by', 'person', approved_by, closed_at FROM periods WHERE approved_by IS NOT NULL
+  UNION ALL SELECT 'close', id, 'for_period', 'period', period_id, phase FROM closes
+  UNION ALL SELECT 'close', c.id, 'covers', 'site', j.value, NULL FROM closes c, json_each(c.sites_json) j
+  UNION ALL SELECT 'close', id, 'started_by', 'person', started_by, started_message_id FROM closes
+  UNION ALL SELECT 'close', id, 'published_by', 'person', published_by, published_message_id
+            FROM closes WHERE published_by IS NOT NULL;
 
 CREATE VIEW IF NOT EXISTS ledger_nodes(type, id, label, status, period_id) AS
   SELECT 'site', id, name, kind, NULL FROM sites
@@ -349,10 +423,12 @@ CREATE VIEW IF NOT EXISTS ledger_nodes(type, id, label, status, period_id) AS
             set_version, NULL FROM emission_factors
   UNION ALL SELECT 'expected', id, category || ' (' || frequency || ')', frequency, NULL FROM expected_documents
   UNION ALL SELECT 'approval', id, decision || ' by ' || approver_handle, decision, period_id FROM approvals
+  UNION ALL SELECT 'close', id, period_id || ' close v' || version || ' (factors ' || factor_set || ')', phase, period_id
+            FROM closes
   UNION ALL SELECT DISTINCT 'person', dst_id, '@' || dst_id, NULL, NULL FROM ledger_edges WHERE dst_type = 'person'
   UNION ALL SELECT DISTINCT 'room', dst_id, dst_id, NULL, NULL FROM ledger_edges WHERE dst_type = 'room'
   UNION ALL SELECT DISTINCT 'run', dst_id, dst_id, NULL, NULL FROM ledger_edges WHERE dst_type = 'run';
 
-INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('graph_version', '1');
+INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('graph_version', '2');
 
 INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('schema_version', '1');

@@ -48,18 +48,39 @@ is re-verified against its PDF on every run.
 | Audit chain | `event_hash(prev_event_hash, at, actor, action, ref, chat_message_id, detail_json)`, `audit_head(conn)` → newest `{id, at, actor, action, event_hash}`, `verify_audit_chain(conn)` → `{ok, events, broken, head, problems}` |
 | Values / ids | `dec`, `dec_str`, `sha256_text`, `dumps`, `loads`, `row_to_dict`, `make_doc_id`, `make_activity_id`, `make_instrument_id`; constants `ACTIVITY_STATUSES`, `ALLOWED_TRANSITIONS`, `GAP_KINDS`, `GAP_STATUSES`, `DOC_KINDS`; exception `LedgerError` |
 | Sites / periods | `upsert_site`, `get_site`, `list_sites`, `match_sites`, `ensure_period`, `get_period`, `list_periods`, `set_period_factor_set`, `close_period(conn, period, approved_by=, actor=)` |
-| Expected evidence | `upsert_expected_document`, `list_expected_documents`, `expected_but_missing(conn, period)` |
+| Closes (the "locks") | `start_close(conn, period, actor=, factor_set=, sites=, chat_message_id=)`, `get_close`, `get_open_close(conn, period)` (resume after a crash), `list_closes`, `set_close_phase(conn, close_id, phase, actor=, chat_message_id=, reason=)`, `publish_close(conn, close_id, published_by=, chat_message_id=, report_sha256=)`, `make_close_id`; constants `CLOSE_PHASES`, `PHASE_TRANSITIONS` |
+| Expected evidence | `upsert_expected_document`, `list_expected_documents`, `expected_but_missing(conn, period, sites=)` (inside the close boundary) |
 | Documents | `add_source_doc`, `get_source_doc`, `get_source_doc_by_sha`, `find_source_docs_by_ref`, `list_source_docs`, `update_source_doc_ref`, `mark_doc_superseded`, `current_doc` |
-| Activities | `add_activity` (always `UNVERIFIED`), `get_activity`, `list_activities(period_id=, site_id=, category=, status=, include_superseded=, source_doc_id=)`, `activity_quantity`, `set_activity_status(conn, id, status, actor=, reason=)`, `supersede_activity(conn, old, new, actor=, reason=)`, `add_activity_note` |
+| Activities | `add_activity` (always `UNVERIFIED`), `get_activity`, `list_activities(period_id=, site_id=, category=, status=, include_superseded=, source_doc_id=)`, `activity_quantity`, `set_activity_status(conn, id, status, actor=, reason=, chat_message_id=)`, `supersede_activity(conn, old, new, actor=, reason=, chat_message_id=)`, `add_activity_note` |
 | Instruments (RECs) | `add_instrument`, `get_instrument`, `list_instruments(period_id=)`, `set_instrument_quality_flags(conn, id, flags, actor=)`, `set_instrument_status` |
-| Gaps | `create_gap(conn, kind=, detail=, created_by=, period_id=, site_id=, owner_handle=, room=, dedupe_key=, refs=)` → `(row, created)`, `get_gap`, `list_gaps`, `set_gap_thread`, `resolve_gap(conn, gap_id, resolution=, resolved_by=, status="RESOLVED")` |
-| Approvals | `record_approval(conn, period_id=, approver_handle=, decision=, note=, report_sha256=)`, `list_approvals` |
+| Gaps | `create_gap(conn, kind=, detail=, created_by=, period_id=, site_id=, owner_handle=, room=, dedupe_key=, refs=, finding_id=)` → `(row, created)`, `get_gap`, `list_gaps`, `set_gap_thread`, `resolve_gap(conn, gap_id, resolution=, resolved_by=, chat_message_id=, status="RESOLVED")` |
+| Approvals | `record_approval(conn, period_id=, approver_handle=, decision=, note=, report_sha256=, chat_message_id=)`, `list_approvals` |
 | Factors / calcs | `add_emission_factor(**row)`, `list_emission_factors`, `add_calculation(activity_id=, factor_id=, scope=, co2e_kg=, code_version=)`, `list_calculations` (append-only: recompute = insert) |
 | Export | `export_period(conn, period)` → the same JSON as `carbonroom ledger export` (`cr.ledger.v1`) |
 
 Status rules (`ALLOWED_TRANSITIONS`): `UNVERIFIED → VERIFIED | FLAGGED | EXCLUDED`, `VERIFIED → FLAGGED | EXCLUDED`
 (the false-done reopen), `FLAGGED → VERIFIED | UNVERIFIED | EXCLUDED`, `EXCLUDED → UNVERIFIED`. `SUPERSEDED` only
 through `supersede_activity`, and it is final. `FLAGGED` and `EXCLUDED` need a reason.
+
+### Closes and the room gate (architecture: "Close" contract, "Switch is load-bearing")
+
+- `start_close` opens `CLOSE-<month>-v<N>` and **locks** its boundary (sites) and factor set: the database refuses
+  to change either, and refuses a different `periods.factor_set_version` while the close is open. One open close
+  per month; after a crash, `get_open_close(conn, month)` returns it and its `phase` (LangGraph state is a cache).
+- Phases (`PHASE_TRANSITIONS`): OPEN to COLLECTING to CALCULATING to CHECKING; CHECKING to AWAITING_HUMANS or
+  DRAFTED; AWAITING_HUMANS and RECHECKING go back and forth and on to DRAFTED; DRAFTED can go back to RECHECKING or
+  AWAITING_HUMANS. Setting the same phase again is a no-op. PUBLISHED only through `publish_close`, and it is final;
+  a correction is a new version (same factor set).
+- **Every human action needs the Switch `chat_message_id` it came from**, checked by the database too:
+  `record_approval` and `resolve_gap` refuse without one; `publish_close` needs the publisher's message **and** their
+  `APPROVE` recorded from the room since this close started. The CLI has no approve/resolve/publish command
+  (`tests/test_publish_needs_room.py`), so without the room there is only an unverified draft.
+- Architecture contract → ledger: Close = `closes` row (`close_id` = `id`, `month` = `period_id`, `sites`,
+  `factor_set`, `phase`, `version`, `published_by`, `published_message_id`). Gap = `gaps` row (`gap_id` = `id`,
+  `finding_id`, `owner` = `owner_handle`, `status`, `thread_root_message_id` = `thread_id`, `opened_at` =
+  `created_at`, `resolved_by`, `resolved_message_id`). Claim = `activities` row; the architecture's claim statuses
+  map onto the ledger's: CONFLICTING and STALE = `FLAGGED` with an open `conflict` / `stale_factor` gap; MISSING =
+  `expected_but_missing` (or a `missing_doc` gap); VERIFIED, UNVERIFIED and superseded are the same.
 
 ### What an activity carries (`activity["extra"]`)
 

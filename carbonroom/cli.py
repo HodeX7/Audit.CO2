@@ -402,6 +402,26 @@ def cmd_ledger_missing(args) -> int:
     return 0
 
 
+def cmd_ledger_closes(args) -> int:
+    """Read-only: each close's locked boundary and factor set, phase and publish record."""
+    from carbonroom.ledger import db
+
+    conn = _connect(args)
+    closes = db.list_closes(conn, args.period)
+    conn.close()
+    if args.json:
+        _print_json(closes)
+        return 0
+    for c in closes:
+        published = (f", published by @{c['published_by']} (message {c['published_message_id']})"
+                     if c["published_by"] else "")
+        print(f"{c['id']} {c['phase']}: sites {', '.join(c['sites'])}; factor set {c['factor_set']}; "
+              f"started by @{c['started_by']}{published}")
+    if not closes:
+        print("no closes yet")
+    return 0
+
+
 def cmd_ledger_verify(args) -> int:
     """Integrity check: every document still hashes the same, every excerpt is still on its page."""
     from carbonroom.ingest import extract
@@ -839,6 +859,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--period", required=True)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_ledger_missing)
+    p = ledger.add_parser("closes", help="each close: locked sites + factor set, phase, who published")
+    p.add_argument("--period")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_ledger_closes)
     p = ledger.add_parser("trace", help="knowledge graph: where did this number / bill / gap come from?")
     p.add_argument("ref", help="ACT-..., CALC-..., GAP-..., DOC-..., a bill number (ELB-AUS-2610), @person, site, YYYY-MM")
     p.add_argument("--depth", type=int, default=6)

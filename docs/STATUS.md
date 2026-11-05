@@ -19,6 +19,7 @@ Each owner updates their own section: done / next / blocked.
 - Knowledge graph: live graph views, `ledger trace` (where did this number come from?), `ledger impact` (what depends on this bill?), `ledger graph` (Mermaid/JSON)
 - Same graph mirrored into Neo4j (graph database), auto-synced: `graphdb why` / `conflicts` / `gaps` / `find` / read-only `query`, `infra/neo4j/docker-compose.yml`. `graphdb selftest` against live Neo4j 2026.07.1 (Docker, macOS): 14/14 passed, 2026-11-04
 - Audit chain: events hash-chained with the Switch `chat_message_id` inside each hash; `ledger verify` checks it (`tests/test_audit_chain.py`)
+- Closes ("locks"): boundary + factor set locked per close, phase in the ledger, versions; approvals, gap closes and publish need the room's `chat_message_id` (`tests/test_publish_needs_room.py`)
 - LLM: `nvidia/nemotron-3-ultra-550b-a55b`, bench 13/13 exact (backup `nvidia/nemotron-3.5-bolt-e4b`, also 13/13); seed extractions re-saved with it
 
 **Next**

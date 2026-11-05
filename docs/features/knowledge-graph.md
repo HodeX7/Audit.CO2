@@ -38,9 +38,10 @@ the ledger, and new rows appear in the graph immediately.
 | `owned_by`, `has_room` | site → person, room | site owner and room |
 | `for_site` | expected → site | `expected_documents` |
 | `for_period`, `by`, `approved_by` | approval → period, person; period → person | human approvals |
+| `for_period`, `covers`, `started_by`, `published_by` | close → period, site, person | `closes` (boundary and who started / published) |
 
 Node types: site, period, doc, activity, instrument, gap, calculation, factor, expected, approval, person,
-room, run.
+room, run, close.
 
 ### Traversal is a recursive SQL query
 
@@ -161,7 +162,7 @@ flowchart LR
 
 - **Projection** (`carbonroom.graphdb.store.projection`): every row of `ledger_nodes` becomes a node, with label
   `Site`, `Period`, `Document`, `Activity`, `Instrument`, `Gap`, `Calculation`, `Factor`, `Expected`, `Approval`,
-  `Person`, `Room` or `Run`, plus the extra label `CR`. Its useful details become properties (quantity as a decimal
+  `Person`, `Room`, `Run` or `Close`, plus the extra label `CR`. Its useful details become properties (quantity as a decimal
   string, excerpt, locator, delivery ticket, PUE, doc number, gap detail, REC region and vintage…). Every row of
   `ledger_edges` becomes a relationship (`detail`, such as the locator, rides on it). A link whose end doesn't exist,
   like an upload that names a gap id never opened, is skipped and counted.

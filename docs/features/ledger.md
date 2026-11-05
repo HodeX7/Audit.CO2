@@ -25,10 +25,11 @@ knowledge graph ([knowledge-graph.md](knowledge-graph.md)). One file, `CR_DB_PAT
 | `emission_factors` | factor sets by version (Richa) |
 | `calculations` | activity × factor results, append-only (Richa) |
 | `instruments` | RECs/PPAs with the same proof as activities; `quality_flags` set by the checker |
-| `gaps` | `GAP-###` problems with a named owner and room; closed only by a human with a written resolution |
-| `approvals` | human APPROVE/REJECT decisions, append-only |
+| `gaps` | `GAP-###` problems with a named owner and room (and the Watchdog `finding_id`); closed only by a human's reply in the room (`resolved_message_id`) |
+| `approvals` | human APPROVE/REJECT decisions with the Switch `chat_message_id` they came from, append-only |
 | `events` | append-only audit log of every write: who, what, about which id, from which chat message (`chat_message_id`); hash-chained (`prev_event_hash`, `event_hash`) |
 | `expected_documents` | which evidence each site must send (`monthly` / `as_delivered`), for missing-bill detection |
+| `closes` | one row per close of a month: locked boundary (sites) and factor set, phase, version, who published from which chat message |
 | `ledger_edges` (view) | every link between rows, as a typed edge: the [knowledge graph](knowledge-graph.md) |
 | `ledger_nodes` (view) | every row (plus people, rooms, runs) as a graph node with a label |
 
@@ -54,6 +55,9 @@ flowchart LR
   T -->|gap -> RESOLVED without resolved_by + resolution| X4[abort]
   T -->|period -> CLOSED without that approver's APPROVE| X5[abort]
   T -->|INSERT event not chained onto the newest event| X7[abort: write events with log_event]
+  T -->|approval or gap close without a chat_message_id| X8[abort: only the room can]
+  T -->|publish without publisher's message + APPROVE from the room| X9[abort]
+  T -->|change a close's sites or factor set; edit a published close| X10[abort: locked]
   T -->|status SUPERSEDED without superseded_by, or leaving SUPERSEDED| X6[abort]
 ```
 
@@ -77,6 +81,37 @@ Re-hashing a forged event doesn't help: the next event still points at the old h
 - Older ledgers: `migrate` hashes events that have no hash yet, in id order, once (and logs
   `audit_chain_backfilled`). It never rewrites an event or an existing hash.
 
+### Closes: locks, phases and the room gate
+
+```mermaid
+stateDiagram-v2
+  [*] --> OPEN: start_close (sites + factor set locked)
+  OPEN --> COLLECTING
+  COLLECTING --> CALCULATING
+  CALCULATING --> CHECKING
+  CHECKING --> AWAITING_HUMANS
+  CHECKING --> DRAFTED
+  AWAITING_HUMANS --> RECHECKING
+  RECHECKING --> AWAITING_HUMANS
+  AWAITING_HUMANS --> DRAFTED
+  RECHECKING --> DRAFTED
+  DRAFTED --> RECHECKING
+  DRAFTED --> AWAITING_HUMANS
+  DRAFTED --> PUBLISHED: publish_close (publisher's message + APPROVE)
+  PUBLISHED --> [*]: final; a correction is version N+1
+```
+
+- `carbonroom.ledger.db.start_close` writes `CLOSE-<month>-v<N>`. The boundary and the factor set are locked by
+  triggers; while the close is open, the month's `factor_set_version` can't be changed to anything else.
+- The phase lives in the ledger, so the orchestrator resumes from `carbonroom.ledger.db.get_open_close` after a
+  crash. Moves follow `PHASE_TRANSITIONS`; repeating the current phase is a no-op.
+- **Switch is load-bearing.** `record_approval` and `resolve_gap` need the Switch `chat_message_id` (the database
+  refuses without one). `carbonroom.ledger.db.publish_close` needs the publisher's message and their `APPROVE` from
+  the room, recorded after this close started, then closes the month. No CLI command approves, resolves or
+  publishes, so outside the room you can only build an unverified draft.
+- `carbonroom.ledger.db.expected_but_missing` only counts sites inside the boundary (the month's latest close),
+  which is what "all collected" is measured against.
+
 Concurrency: WAL mode, 30 s busy timeout, writes inside `BEGIN IMMEDIATE` (`carbonroom.ledger.db.transaction`),
 which joins an outer transaction if one is open. Several agents can share the file.
 
@@ -84,7 +119,8 @@ which joins an outer transaction if one is open. Several agents can share the fi
 
 See `docs/DECISIONS.md` (Ujjwal): decimal strings; guards as triggers; additive columns listed in
 `contracts/CHANGES.md`; `expected_documents`; cloud as a `sites` row; reset by removing the file, never SQL DELETE;
-the audit chain (hash per event, `chat_message_id` inside the hash, enforced by a trigger, backfilled once).
+the audit chain (hash per event, `chat_message_id` inside the hash, enforced by a trigger, backfilled once);
+closes as rows with locked boundary and factor set; human actions need the room's message id.
 
 ## Code map
 
@@ -103,6 +139,9 @@ the audit chain (hash per event, `chat_message_id` inside the hash, enforced by 
 | `carbonroom.ledger.db.log_event` | append one event to the audit chain (under the write lock) |
 | `carbonroom.ledger.db.verify_audit_chain` | recompute every link; name the first broken event |
 | `carbonroom.ledger.db.audit_head` | the newest event's hash, to post in the room |
+| `carbonroom.ledger.db.start_close` | open the next version of a month's close; lock sites + factor set |
+| `carbonroom.ledger.db.set_close_phase` | move a close along `PHASE_TRANSITIONS`, logged |
+| `carbonroom.ledger.db.publish_close` | the human publish gate (message id + APPROVE from the room) |
 
 The full function list is in `docs/HANDOFF.md`.
 
@@ -117,6 +156,13 @@ the hash; an edited, re-hashed or removed event is found where it happened; raw 
 newest event are refused; four agents writing at once never fork the chain; an older ledger is hashed once and
 keeps its append-only guard; `carbonroom ledger verify` reports the chain and exits 1 when it's broken.
 
+`tests/test_closes.py`: start locks sites and factor set (and raw SQL can't change them); one open close per month
+and resume finds it; phases follow the flow and repeat safely; a new version only after publishing, same factor
+set; bad boundaries refused; missing evidence counted only inside the boundary; closes in the graph and export.
+`tests/test_publish_needs_room.py`: approvals and gap closes refused without a chat message id (raw SQL too);
+publish needs the publisher's message and their own APPROVE from the room since this close started; a published
+close is final; the CLI has no approve, resolve or publish command.
+
 ## Commands
 
 | Command | Flags |
@@ -127,6 +173,7 @@ keeps its append-only guard; `carbonroom ledger verify` reports the chain and ex
 | `carbonroom ledger gaps` | `--period`, `--status`, `--json` |
 | `carbonroom ledger missing` | `--period` (required), `--json` |
 | `carbonroom ledger events` | `--limit` (default 40), `--ref ID`, `--json` |
+| `carbonroom ledger closes` | `--period`, `--json` |
 | `carbonroom ledger verify` | `--period`, `--verbose` / `-v`; also checks the audit chain; exits 1 if any file, excerpt or chain link fails |
 
 ## How to use

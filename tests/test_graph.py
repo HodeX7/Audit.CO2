@@ -113,7 +113,7 @@ def test_gap_refs_become_edges(seeded):
     (g,) = r["gaps"]
     rels = {(e["rel"], e["dst_type"]) for e in graph.edges(seeded, "gap", g["id"], "out")}
     assert {("about", "doc"), ("owned_by", "person"), ("raised_in", "room")} <= rels
-    db.resolve_gap(seeded, g["id"], resolution="re-sent as PDF", resolved_by="lena")
+    db.resolve_gap(seeded, g["id"], resolution="re-sent as PDF", resolved_by="lena", chat_message_id="mm-3")
     assert ("resolved_by", "person") in {(e["rel"], e["dst_type"]) for e in graph.edges(seeded, "gap", g["id"], "out")}
 
 

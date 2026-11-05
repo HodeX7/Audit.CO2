@@ -40,7 +40,7 @@ META_LABEL = "CRMeta"
 TYPE_LABELS = {
     "site": "Site", "period": "Period", "doc": "Document", "activity": "Activity", "instrument": "Instrument",
     "gap": "Gap", "calculation": "Calculation", "factor": "Factor", "expected": "Expected",
-    "approval": "Approval", "person": "Person", "room": "Room", "run": "Run",
+    "approval": "Approval", "person": "Person", "room": "Room", "run": "Run", "close": "Close",
 }
 LABELS = tuple(TYPE_LABELS.values())
 _REL = re.compile(r"^[A-Z_]+$")
@@ -114,6 +114,10 @@ def _details(conn: sqlite3.Connection) -> dict[tuple[str, str], dict[str, Any]]:
     for row in conn.execute("SELECT * FROM approvals"):
         d[("approval", row["id"])] = {"decision": row["decision"], "note": row["note"], "at": row["at"],
                                       "report_sha256": row["report_sha256"]}
+    for c in db.list_closes(conn):
+        d[("close", c["id"])] = {"version": c["version"], "phase": c["phase"], "factor_set": c["factor_set"],
+                                 "started_at": c["started_at"], "published_at": c["published_at"],
+                                 "published_message_id": c["published_message_id"]}
     for row in conn.execute("SELECT * FROM events WHERE action = 'batch_finished'"):
         detail = db.row_to_dict(row)["detail"] or {}
         d[("run", row["ref"])] = {"summary_text": detail.get("summary_text"), "finished_at": detail.get("finished_at")}

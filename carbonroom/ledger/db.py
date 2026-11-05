@@ -25,7 +25,7 @@ from typing import Any, Iterable, Iterator
 from carbonroom import config
 
 SCHEMA_VERSION = "1"
-GRAPH_VERSION = "1"  # bump when the ledger_nodes / ledger_edges views in contracts/schema.sql change
+GRAPH_VERSION = "2"  # bump when the ledger_nodes / ledger_edges views in contracts/schema.sql change
 
 ACTIVITY_STATUSES = ("UNVERIFIED", "VERIFIED", "FLAGGED", "EXCLUDED", "SUPERSEDED")
 # SUPERSEDED is reached only through supersede_activity(), which also sets superseded_by.
@@ -47,6 +47,19 @@ GAP_KINDS = (
 )
 GAP_STATUSES = ("OPEN", "RESOLVED", "ACCEPTED_RISK")
 DOC_KINDS = ("utility_bill", "fuel_invoice", "cloud_invoice", "rec_certificate", "other")
+CLOSE_PHASES = ("OPEN", "COLLECTING", "CALCULATING", "CHECKING", "AWAITING_HUMANS", "RECHECKING", "DRAFTED",
+                "PUBLISHED")
+# PUBLISHED is reached only through publish_close(), which needs the publisher's chat message and APPROVE.
+PHASE_TRANSITIONS: dict[str, set[str]] = {
+    "OPEN": {"COLLECTING"},
+    "COLLECTING": {"CALCULATING"},
+    "CALCULATING": {"CHECKING"},
+    "CHECKING": {"AWAITING_HUMANS", "DRAFTED"},
+    "AWAITING_HUMANS": {"RECHECKING", "DRAFTED"},
+    "RECHECKING": {"AWAITING_HUMANS", "DRAFTED"},
+    "DRAFTED": {"RECHECKING", "AWAITING_HUMANS"},
+    "PUBLISHED": set(),
+}
 JSON_COLUMNS = {
     "aliases_json",
     "meta_json",
@@ -54,6 +67,7 @@ JSON_COLUMNS = {
     "refs_json",
     "detail_json",
     "quality_flags",
+    "sites_json",
 }
 
 
@@ -175,6 +189,9 @@ _ADDITIVE_COLUMNS: list[tuple[str, str, str]] = [
     ("events", "chat_message_id", "TEXT"),
     ("events", "prev_event_hash", "TEXT"),
     ("events", "event_hash", "TEXT"),
+    ("approvals", "chat_message_id", "TEXT"),
+    ("gaps", "finding_id", "TEXT"),
+    ("gaps", "resolved_message_id", "TEXT"),
 ]
 
 
@@ -415,7 +432,10 @@ def set_period_factor_set(conn: sqlite3.Connection, period_id: str, version: str
             raise LedgerError(f"unknown period {period_id}")
         if period["status"] == "CLOSED":
             raise LedgerError(f"period {period_id} is CLOSED; its factor set is locked")
-        conn.execute("UPDATE periods SET factor_set_version = ? WHERE id = ?", (version, period_id))
+        try:
+            conn.execute("UPDATE periods SET factor_set_version = ? WHERE id = ?", (version, period_id))
+        except sqlite3.IntegrityError as exc:  # an open close locked it
+            raise LedgerError(str(exc)) from exc
         log_event(conn, actor, "period_factor_set", period_id, {"from": period["factor_set_version"], "to": version})
     return get_period(conn, period_id)
 
@@ -437,6 +457,140 @@ def close_period(conn: sqlite3.Connection, period_id: str, *, approved_by: str, 
             raise LedgerError(str(exc)) from exc
         log_event(conn, actor, "period_closed", period_id, {"approved_by": approved_by})
     return get_period(conn, period_id)
+
+
+# ---------------------------------------------------------------------------
+# Closes: one row per close of a month (boundary + factor set locked at the start, phase, version)
+# ---------------------------------------------------------------------------
+
+
+def make_close_id(period_id: str, version: int) -> str:
+    return f"CLOSE-{period_id}-v{version}"
+
+
+def start_close(
+    conn: sqlite3.Connection,
+    period_id: str,
+    *,
+    actor: str,
+    factor_set: str | None = None,
+    sites: Iterable[str] | None = None,
+    chat_message_id: str | None = None,
+) -> dict:
+    """Open the next version of a month's close and lock its boundary (sites) and factor set.
+
+    `factor_set` defaults to the period's factor set, then CR_FACTOR_SET; `sites` to every site.
+    Refuses while the month already has an open close: resume that one (get_open_close)."""
+    with transaction(conn):
+        period = ensure_period(conn, period_id, actor=actor)
+        open_close = get_open_close(conn, period_id)
+        if open_close:
+            raise LedgerError(f"{open_close['id']} is still {open_close['phase']}; resume it instead")
+        known = [s["id"] for s in list_sites(conn)]
+        boundary = sorted(set(sites)) if sites is not None else known
+        unknown = [s for s in boundary if s not in known]
+        if unknown or not boundary:
+            raise LedgerError(f"unknown site(s) for the close boundary: {', '.join(unknown) or '(none given)'}")
+        chosen = factor_set or period["factor_set_version"] or config.factor_set()
+        if not chosen:
+            raise LedgerError("a close needs a factor set to lock (pass factor_set or set CR_FACTOR_SET)")
+        if period["status"] == "CLOSED" and chosen != period["factor_set_version"]:
+            raise LedgerError(f"{period_id} is CLOSED with factor set {period['factor_set_version']}; "
+                              "a new version must use the same set")
+        version = conn.execute("SELECT COALESCE(MAX(version), 0) + 1 AS v FROM closes WHERE period_id = ?",
+                               (period_id,)).fetchone()["v"]
+        close_id = make_close_id(period_id, version)
+        conn.execute(
+            "INSERT INTO closes(id, period_id, version, sites_json, factor_set, phase, started_by, "
+            "started_message_id, started_at) VALUES (?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)",
+            (close_id, period_id, version, dumps(boundary), chosen, actor, chat_message_id, config.now_iso()),
+        )
+        if period["factor_set_version"] != chosen:
+            conn.execute("UPDATE periods SET factor_set_version = ? WHERE id = ?", (chosen, period_id))
+        log_event(conn, actor, "close_started", close_id,
+                  {"period": period_id, "version": version, "sites": boundary, "factor_set": chosen},
+                  chat_message_id=chat_message_id)
+    return get_close(conn, close_id)
+
+
+def get_close(conn: sqlite3.Connection, close_id: str) -> dict | None:
+    return row_to_dict(conn.execute("SELECT * FROM closes WHERE id = ?", (close_id,)).fetchone())
+
+
+def get_open_close(conn: sqlite3.Connection, period_id: str) -> dict | None:
+    """The month's close that isn't published yet (at most one), or None."""
+    row = conn.execute("SELECT * FROM closes WHERE period_id = ? AND phase != 'PUBLISHED' ORDER BY version DESC "
+                       "LIMIT 1", (period_id,)).fetchone()
+    return row_to_dict(row)
+
+
+def list_closes(conn: sqlite3.Connection, period_id: str | None = None) -> list[dict]:
+    if period_id:
+        rows = conn.execute("SELECT * FROM closes WHERE period_id = ? ORDER BY version", (period_id,))
+    else:
+        rows = conn.execute("SELECT * FROM closes ORDER BY period_id, version")
+    return [row_to_dict(r) for r in rows]
+
+
+def set_close_phase(
+    conn: sqlite3.Connection,
+    close_id: str,
+    phase: str,
+    *,
+    actor: str,
+    chat_message_id: str | None = None,
+    reason: str | None = None,
+) -> dict:
+    """Move a close along PHASE_TRANSITIONS (same phase = no-op, so a resumed run can repeat itself)."""
+    with transaction(conn):
+        close = get_close(conn, close_id)
+        if close is None:
+            raise LedgerError(f"unknown close {close_id}")
+        old = close["phase"]
+        if phase == old:
+            return close
+        if phase == "PUBLISHED":
+            raise LedgerError("publish with publish_close(): it needs the publisher's chat message and APPROVE")
+        if phase not in PHASE_TRANSITIONS.get(old, set()):
+            raise LedgerError(f"{close_id}: {old} -> {phase} is not allowed")
+        conn.execute("UPDATE closes SET phase = ? WHERE id = ?", (phase, close_id))
+        log_event(conn, actor, "close_phase", close_id, {"from": old, "to": phase, "reason": reason},
+                  chat_message_id=chat_message_id)
+    return get_close(conn, close_id)
+
+
+def publish_close(
+    conn: sqlite3.Connection,
+    close_id: str,
+    *,
+    published_by: str,
+    chat_message_id: str | None,
+    report_sha256: str | None = None,
+    actor: str | None = None,
+) -> dict:
+    """The human publish gate. Refused (by the database too) without the publisher's Switch chat message and
+    their APPROVE from the room since this close started. Also closes the month if it is still OPEN."""
+    if not (chat_message_id and chat_message_id.strip()):
+        raise LedgerError("publishing needs the Switch chat_message_id of the publish command")
+    with transaction(conn):
+        close = get_close(conn, close_id)
+        if close is None:
+            raise LedgerError(f"unknown close {close_id}")
+        if close["phase"] != "DRAFTED":
+            raise LedgerError(f"{close_id} is {close['phase']}; only a DRAFTED close can be published")
+        try:
+            conn.execute(
+                "UPDATE closes SET phase = 'PUBLISHED', published_by = ?, published_message_id = ?, "
+                "published_at = ?, report_sha256 = ? WHERE id = ?",
+                (published_by, chat_message_id, config.now_iso(), report_sha256, close_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise LedgerError(str(exc)) from exc
+        log_event(conn, actor or published_by, "close_published", close_id,
+                  {"published_by": published_by, "report_sha256": report_sha256}, chat_message_id=chat_message_id)
+        if (get_period(conn, close["period_id"]) or {}).get("status") == "OPEN":
+            close_period(conn, close["period_id"], approved_by=published_by, actor=actor or published_by)
+    return get_close(conn, close_id)
 
 
 def upsert_expected_document(
@@ -471,14 +625,21 @@ def list_expected_documents(conn: sqlite3.Connection, site_id: str | None = None
     return [row_to_dict(r) for r in rows]
 
 
-def expected_but_missing(conn: sqlite3.Connection, period_id: str) -> list[dict]:
+def expected_but_missing(conn: sqlite3.Connection, period_id: str, *,
+                          sites: Iterable[str] | None = None) -> list[dict]:
     """Monthly evidence that has no live (non-superseded) activity for `period_id`.
 
+    Only sites inside the close boundary count: `sites`, else the month's latest close, else every site.
     Read-only helper for the checker; it does not open gaps itself.
     """
+    if sites is None:
+        row = conn.execute("SELECT sites_json FROM closes WHERE period_id = ? ORDER BY version DESC LIMIT 1",
+                           (period_id,)).fetchone()
+        sites = loads(row["sites_json"]) if row else None
+    boundary = set(sites) if sites is not None else None
     missing = []
     for exp in list_expected_documents(conn):
-        if exp["frequency"] != "monthly":
+        if exp["frequency"] != "monthly" or (boundary is not None and exp["site_id"] not in boundary):
             continue
         row = conn.execute(
             """SELECT 1 FROM activities WHERE site_id=? AND period_id=? AND category=?
@@ -720,9 +881,11 @@ def activity_quantity(activity: dict) -> Decimal:
 
 
 def set_activity_status(
-    conn: sqlite3.Connection, activity_id: str, new_status: str, *, actor: str, reason: str | None = None
+    conn: sqlite3.Connection, activity_id: str, new_status: str, *, actor: str, reason: str | None = None,
+    chat_message_id: str | None = None,
 ) -> dict:
-    """Move an activity along ALLOWED_TRANSITIONS. EXCLUDED and FLAGGED need a reason."""
+    """Move an activity along ALLOWED_TRANSITIONS. EXCLUDED and FLAGGED need a reason. Pass `chat_message_id`
+    when a human's reply caused the change (Tier 2), so the audit chain shows it."""
     if new_status not in ACTIVITY_STATUSES:
         raise LedgerError(f"unknown status {new_status!r}")
     if new_status == "SUPERSEDED":
@@ -742,12 +905,14 @@ def set_activity_status(
             "UPDATE activities SET status=?, status_reason=?, updated_at=? WHERE id=?",
             (new_status, reason, config.now_iso(), activity_id),
         )
-        log_event(conn, actor, "activity_status", activity_id, {"from": old, "to": new_status, "reason": reason})
+        log_event(conn, actor, "activity_status", activity_id, {"from": old, "to": new_status, "reason": reason},
+                  chat_message_id=chat_message_id)
     return get_activity(conn, activity_id)
 
 
 def supersede_activity(
-    conn: sqlite3.Connection, old_id: str, new_id: str, *, actor: str, reason: str
+    conn: sqlite3.Connection, old_id: str, new_id: str, *, actor: str, reason: str,
+    chat_message_id: str | None = None,
 ) -> dict:
     """Old row -> SUPERSEDED, pointing at the new row. Both rows stay in the ledger."""
     if not (reason and reason.strip()):
@@ -767,7 +932,8 @@ def supersede_activity(
             "UPDATE activities SET status='SUPERSEDED', superseded_by=?, status_reason=?, updated_at=? WHERE id=?",
             (new_id, reason, config.now_iso(), old_id),
         )
-        log_event(conn, actor, "activity_superseded", old_id, {"by": new_id, "from": old["status"], "reason": reason})
+        log_event(conn, actor, "activity_superseded", old_id, {"by": new_id, "from": old["status"], "reason": reason},
+                  chat_message_id=chat_message_id)
     return get_activity(conn, old_id)
 
 
@@ -935,6 +1101,7 @@ def create_gap(
     room: str | None = None,
     dedupe_key: str | None = None,
     refs: dict[str, Any] | None = None,
+    finding_id: str | None = None,
 ) -> tuple[dict, bool]:
     """Open a gap (GAP-###). With a dedupe_key, the same problem is never opened twice.
 
@@ -956,10 +1123,10 @@ def create_gap(
         gap_id = _next_gap_id(conn)
         conn.execute(
             """INSERT INTO gaps(id, period_id, site_id, kind, detail, owner_handle, room, status,
-                                created_at, created_by, dedupe_key, refs_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)""",
+                                created_at, created_by, dedupe_key, refs_json, finding_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?)""",
             (gap_id, period_id, site_id, kind, detail, owner, gap_room, config.now_iso(), created_by,
-             dedupe_key, dumps(refs or {})),
+             dedupe_key, dumps(refs or {}), finding_id),
         )
         log_event(conn, created_by, "gap_opened", gap_id, {"kind": kind, "owner": owner, "room": gap_room})
     return get_gap(conn, gap_id), True
@@ -1008,14 +1175,18 @@ def resolve_gap(
     *,
     resolution: str,
     resolved_by: str,
+    chat_message_id: str | None = None,
     status: str = "RESOLVED",
     actor: str | None = None,
 ) -> dict:
-    """Close a gap. Needs the human who resolved it and their words. Never automatic."""
+    """Close a gap. Needs the human who resolved it, their words, and the Switch message of their reply
+    (`chat_message_id`). Never automatic, and never from outside the room."""
     if status not in ("RESOLVED", "ACCEPTED_RISK"):
         raise LedgerError("status must be RESOLVED or ACCEPTED_RISK")
     if not (resolution and resolution.strip()) or not (resolved_by and resolved_by.strip()):
         raise LedgerError("a resolution and the resolving human's handle are required")
+    if not (chat_message_id and chat_message_id.strip()):
+        raise LedgerError("closing a gap needs the Switch chat_message_id of the human's reply")
     with transaction(conn):
         gap = get_gap(conn, gap_id)
         if gap is None:
@@ -1023,11 +1194,12 @@ def resolve_gap(
         if gap["status"] != "OPEN":
             raise LedgerError(f"{gap_id} is already {gap['status']}")
         conn.execute(
-            "UPDATE gaps SET status=?, resolution=?, resolved_by=?, resolved_at=? WHERE id=?",
-            (status, resolution, resolved_by, config.now_iso(), gap_id),
+            "UPDATE gaps SET status=?, resolution=?, resolved_by=?, resolved_at=?, resolved_message_id=? WHERE id=?",
+            (status, resolution, resolved_by, config.now_iso(), chat_message_id, gap_id),
         )
         log_event(conn, actor or resolved_by, "gap_resolved", gap_id,
-                  {"status": status, "resolved_by": resolved_by, "resolution": resolution})
+                  {"status": status, "resolved_by": resolved_by, "resolution": resolution},
+                  chat_message_id=chat_message_id)
     return get_gap(conn, gap_id)
 
 
@@ -1045,22 +1217,26 @@ def record_approval(
     note: str | None = None,
     report_sha256: str | None = None,
     actor: str | None = None,
+    chat_message_id: str | None = None,
 ) -> dict:
-    """Append a human decision. Checking that the handle is THE approver is the caller's job."""
+    """Append a human decision, made in the room (`chat_message_id` of the reply is required).
+    Checking that the handle may approve (people.yaml roles) is the caller's job."""
     if decision not in ("APPROVE", "REJECT"):
         raise LedgerError("decision must be APPROVE or REJECT")
+    if not (chat_message_id and chat_message_id.strip()):
+        raise LedgerError("an approval needs the Switch chat_message_id it came from")
     with transaction(conn):
         if get_period(conn, period_id) is None:
             raise LedgerError(f"unknown period {period_id}")
         n = conn.execute("SELECT COUNT(*) AS n FROM approvals WHERE period_id=?", (period_id,)).fetchone()["n"]
         apr_id = f"APR-{period_id}-{n + 1}"
         conn.execute(
-            "INSERT INTO approvals(id, period_id, approver_handle, decision, note, report_sha256, at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (apr_id, period_id, approver_handle, decision, note, report_sha256, config.now_iso()),
+            "INSERT INTO approvals(id, period_id, approver_handle, decision, note, report_sha256, at, chat_message_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (apr_id, period_id, approver_handle, decision, note, report_sha256, config.now_iso(), chat_message_id),
         )
         log_event(conn, actor or approver_handle, "approval_recorded", apr_id,
-                  {"decision": decision, "report_sha256": report_sha256})
+                  {"decision": decision, "report_sha256": report_sha256}, chat_message_id=chat_message_id)
     return row_to_dict(conn.execute("SELECT * FROM approvals WHERE id=?", (apr_id,)).fetchone())
 
 
@@ -1173,6 +1349,7 @@ def export_period(conn: sqlite3.Connection, period_id: str) -> dict[str, Any]:
         "instruments": instruments,
         "gaps": list_gaps(conn, period_id=period_id),
         "approvals": list_approvals(conn, period_id),
+        "closes": list_closes(conn, period_id),
         "counts": {"activities_by_status": counts, "gaps_open": sum(
             1 for g in list_gaps(conn, period_id=period_id) if g["status"] == "OPEN")},
     }

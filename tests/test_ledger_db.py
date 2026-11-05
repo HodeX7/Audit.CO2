@@ -11,7 +11,7 @@ import pytest
 from carbonroom.ledger import db
 
 TABLES = ["sites", "periods", "source_docs", "activities", "emission_factors", "calculations", "instruments",
-          "gaps", "approvals", "events", "expected_documents"]
+          "gaps", "approvals", "events", "expected_documents", "closes"]
 
 
 def _activity(conn, quantity="191300", excerpt="Total energy used this period: 191,300 kWh"):
@@ -34,7 +34,8 @@ def _one_row_everywhere(conn):
     db.add_instrument(conn, period_id="2026-10", kind="REC", mwh="120", source_doc_id=act["source_doc_id"],
                       created_by="test", excerpt="Quantity retired: 120 MWh")
     db.create_gap(conn, kind="missing_doc", detail="x", created_by="test", site_id="austin")
-    db.record_approval(conn, period_id="2026-10", approver_handle="grace", decision="REJECT")
+    db.record_approval(conn, period_id="2026-10", approver_handle="grace", decision="REJECT", chat_message_id="m")
+    db.start_close(conn, "2026-10", actor="maya", factor_set="v1", chat_message_id="m0")
 
 
 @pytest.mark.parametrize("table", TABLES)
@@ -111,21 +112,23 @@ def test_gaps_ids_dedupe_and_human_resolution(conn):
     with pytest.raises(sqlite3.DatabaseError, match="resolved_by"):
         conn.execute("UPDATE gaps SET status='RESOLVED' WHERE id='GAP-001'")
     with pytest.raises(db.LedgerError):
-        db.resolve_gap(conn, "GAP-001", resolution="", resolved_by="omar")
-    done = db.resolve_gap(conn, "GAP-001", resolution="uploaded the bill", resolved_by="lena")
+        db.resolve_gap(conn, "GAP-001", resolution="", resolved_by="omar", chat_message_id="m1")
+    done = db.resolve_gap(conn, "GAP-001", resolution="uploaded the bill", resolved_by="lena",
+                         chat_message_id="m2")
     assert done["status"] == "RESOLVED" and done["resolved_by"] == "lena"
     with pytest.raises(db.LedgerError, match="already"):
-        db.resolve_gap(conn, "GAP-001", resolution="again", resolved_by="lena")
+        db.resolve_gap(conn, "GAP-001", resolution="again", resolved_by="lena", chat_message_id="m3")
 
 
 def test_period_closes_only_after_recorded_approval(conn):
     db.ensure_period(conn, "2026-10")
     with pytest.raises(db.LedgerError, match="APPROVE"):
         db.close_period(conn, "2026-10", approved_by="grace", actor="cr-reporter")
-    db.record_approval(conn, period_id="2026-10", approver_handle="omar", decision="APPROVE")
+    db.record_approval(conn, period_id="2026-10", approver_handle="omar", decision="APPROVE", chat_message_id="m4")
     with pytest.raises(db.LedgerError, match="APPROVE"):  # approval by someone else doesn't count
         db.close_period(conn, "2026-10", approved_by="grace", actor="cr-reporter")
-    db.record_approval(conn, period_id="2026-10", approver_handle="grace", decision="APPROVE", report_sha256="ab")
+    db.record_approval(conn, period_id="2026-10", approver_handle="grace", decision="APPROVE", report_sha256="ab",
+                       chat_message_id="m5")
     assert db.close_period(conn, "2026-10", approved_by="grace", actor="cr-reporter")["status"] == "CLOSED"
     with pytest.raises(db.LedgerError, match="locked"):
         db.set_period_factor_set(conn, "2026-10", "v2", actor="x")
@@ -133,7 +136,8 @@ def test_period_closes_only_after_recorded_approval(conn):
 
 def test_events_and_approvals_are_append_only(conn):
     db.ensure_period(conn, "2026-10")
-    db.record_approval(conn, period_id="2026-10", approver_handle="grace", decision="REJECT", note="no")
+    db.record_approval(conn, period_id="2026-10", approver_handle="grace", decision="REJECT", note="no",
+                       chat_message_id="m6")
     with pytest.raises(sqlite3.DatabaseError, match="append-only"):
         conn.execute("UPDATE events SET actor='someone'")
     with pytest.raises(sqlite3.DatabaseError, match="append-only"):

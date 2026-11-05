@@ -34,9 +34,10 @@ ID_PREFIXES = {
     "APR-": "approval",
     "EXP-": "expected",
     "RUN-": "run",
+    "CLOSE-": "close",
 }
 NODE_TYPES = ("site", "period", "doc", "activity", "instrument", "gap", "calculation", "factor", "expected",
-              "approval", "person", "room", "run")
+              "approval", "person", "room", "run", "close")
 # Shared hubs: a walk passes THROUGH them only from the start node, so "trace this number" doesn't
 # drag in every other number from the same month, person or room.
 HUBS = ("person", "room", "period", "run", "site")
