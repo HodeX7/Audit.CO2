@@ -6,7 +6,7 @@ import json
 import sqlite3
 from dataclasses import asdict
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from carbon_room.models import (
@@ -20,6 +20,7 @@ _CLOSE_PHASES = {
     "OPEN", "COLLECTING", "CALCULATING", "CHECKING", "AWAITING_HUMANS",
     "RECHECKING", "DRAFTED", "PUBLISHED",
 }
+_ACTIVITY_UNITS = {"electricity_kwh": "kWh", "diesel_l": "L", "dc_it_kwh": "kWh"}
 
 
 def _now() -> str:
@@ -143,6 +144,20 @@ def source_for_sha(conn, close_id, sha256) -> Source | None:
 def add_claim(conn, claim, actor, chat_message_id: str | None = None) -> str:
     _human_message(actor, chat_message_id)
     _close_or_raise(conn, claim.close_id)
+    expected_unit = _ACTIVITY_UNITS.get(claim.activity) if isinstance(claim.activity, str) else None
+    if expected_unit is None:
+        raise ValueError(f"unsupported claim activity: {claim.activity!r}")
+    if claim.unit != expected_unit:
+        raise ValueError(f"claim unit for {claim.activity} must be {expected_unit}")
+    try:
+        claim_value = Decimal(str(claim.value))
+    except InvalidOperation as error:
+        raise ValueError("claim value must be decimal") from error
+    if not claim_value.is_finite() or claim_value <= 0:
+        raise ValueError("claim value must be a positive finite decimal")
+    source = conn.execute("SELECT close_id FROM sources WHERE source_doc_id = ?", (claim.source_doc_id,)).fetchone()
+    if source is None or source["close_id"] != claim.close_id:
+        raise ValueError("claim source must belong to the same close")
     claim_id = claim.claim_id or next_id(conn, "CL")
     values = asdict(claim) | {"claim_id": claim_id, "value": str(claim.value), "status": "UNVERIFIED", "checked_by": None,
                               "attributes": _json(claim.attributes), "created_at": _now()}
@@ -186,6 +201,9 @@ def set_status(conn, claim_id, new_status, actor, reason, chat_message_id=None) 
 
 def set_factor(conn, claim_id, factor_id, factor_version, actor, reason, chat_message_id=None) -> None:
     _human_message(actor, chat_message_id); claim = get_claim(conn, claim_id)
+    factor = get_factor(conn, factor_id)
+    if factor["version"] != factor_version:
+        raise ValueError(f"factor version mismatch for {factor_id!r}")
     conn.execute("UPDATE claims SET factor_id = ?, factor_version = ? WHERE claim_id = ?", (factor_id, factor_version, claim_id))
     append_event(conn, claim.close_id, actor, "factor_set", claim_id=claim_id, chat_message_id=chat_message_id, reason=reason,
                  payload={"factor_id": factor_id, "factor_version": factor_version})
@@ -301,10 +319,20 @@ def get_approvals(conn, close_id, *, subject_id=None):
 
 def load_factors(conn, rows):
     for row in rows:
-        conn.execute("""INSERT INTO factors VALUES (:factor_id,:source,:version,:year,:activity,:geography,:value,:unit,:citation)
-                     ON CONFLICT(factor_id) DO UPDATE SET source=excluded.source,version=excluded.version,year=excluded.year,
-                     activity=excluded.activity,geography=excluded.geography,value=excluded.value,unit=excluded.unit,citation=excluded.citation""",
-                     {**row, "value": str(row["value"])})
+        try:
+            factor_value = Decimal(str(row["value"]))
+        except (KeyError, InvalidOperation) as error:
+            raise ValueError("factor value must be decimal") from error
+        if not factor_value.is_finite() or factor_value <= 0:
+            raise ValueError("factor value must be a positive finite decimal")
+        incoming = {**row, "value": str(factor_value)}
+        existing = conn.execute("SELECT * FROM factors WHERE factor_id = ?", (incoming["factor_id"],)).fetchone()
+        if existing is not None:
+            if dict(existing) != incoming:
+                raise ValueError(f"factor {incoming['factor_id']!r} is immutable; create a new factor id")
+            continue
+        conn.execute("""INSERT INTO factors VALUES (:factor_id,:source,:version,:year,:activity,:geography,:value,:unit,:citation)""",
+                     incoming)
     return len(rows)
 
 

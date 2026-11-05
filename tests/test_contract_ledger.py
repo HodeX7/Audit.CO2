@@ -49,6 +49,38 @@ def test_claim_is_forced_unverified_and_status_guardrails_hold(db):
     assert ledger.get_claim(db, claim_id).status == "VERIFIED"
 
 
+def test_claim_and_factor_boundaries_reject_invalid_or_mutable_inputs(db):
+    close_id = _close(db)
+    source = Source("SRC-boundary", close_id, "test-site", "utility_pdf", "bill.pdf", "var/store/bill.pdf", "boundary", 1,
+                    "1 kWh", None, None, "OK", None)
+    ledger.add_source(db, source, SYSTEM)
+    invalid = Claim("CL-boundary", close_id, "test-site", "2026-10", "override_close", Decimal("1"), "kWh", "2",
+                    source.source_doc_id, "1 kWh", source.sha256, 0, None, None, "UNVERIFIED", "collector", None, None)
+    with pytest.raises(ValueError, match="unsupported claim activity"):
+        ledger.add_claim(db, invalid, SYSTEM)
+    invalid_value = Claim("CL-negative", close_id, "test-site", "2026-10", "electricity_kwh", Decimal("-1"), "kWh", "2",
+                          source.source_doc_id, "-1 kWh", source.sha256, 0, None, None, "UNVERIFIED", "collector", None, None)
+    with pytest.raises(ValueError, match="positive finite"):
+        ledger.add_claim(db, invalid_value, SYSTEM)
+    ledger.load_factors(db, [{
+        "factor_id": "F-immutable", "source": "official", "version": "v1", "year": "2026",
+        "activity": "electricity_kwh", "geography": "test", "value": Decimal("0.2"),
+        "unit": "kgCO2e/kWh", "citation": "first",
+    }])
+    with pytest.raises(ValueError, match="immutable"):
+        ledger.load_factors(db, [{
+            "factor_id": "F-immutable", "source": "attacker", "version": "v9", "year": "2026",
+            "activity": "electricity_kwh", "geography": "test", "value": Decimal("999"),
+            "unit": "kgCO2e/kWh", "citation": "replaced",
+        }])
+    with pytest.raises(ValueError, match="positive finite"):
+        ledger.load_factors(db, [{
+            "factor_id": "F-negative", "source": "official", "version": "v1", "year": "2026",
+            "activity": "electricity_kwh", "geography": "test", "value": Decimal("-1"),
+            "unit": "kgCO2e/kWh", "citation": "invalid",
+        }])
+
+
 def test_ledger_rejects_unknown_contract_states_and_event_rewrites(db):
     close_id = _close(db)
     with pytest.raises(ValueError, match="unknown close phase"):

@@ -8,6 +8,9 @@ from email.parser import BytesParser
 from pathlib import Path
 
 
+MAX_SOURCE_BYTES = 10 * 1024 * 1024
+
+
 def read(path: str | Path) -> tuple[str, list[str] | str]:
     """Return `(SourceKind, pages)` or `(SourceKind, error)`; corrupt inputs never escape."""
     file = Path(path)
@@ -15,6 +18,8 @@ def read(path: str | Path) -> tuple[str, list[str] | str]:
     kinds = {".pdf": "utility_pdf", ".eml": "email_invoice", ".csv": "drive_csv", ".json": "cloud_invoice"}
     kind = kinds.get(suffix, "utility_pdf")
     try:
+        if file.is_symlink() or not file.is_file() or file.stat().st_size > MAX_SOURCE_BYTES:
+            return kind, f"unreadable {file.name}"
         if suffix == ".pdf":
             import pdfplumber
 

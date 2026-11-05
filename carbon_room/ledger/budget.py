@@ -11,6 +11,8 @@ from carbon_room.models import BudgetExceeded
 def charge(conn: sqlite3.Connection, close_id: str, agent: str, tokens: int, *, limit: int = 200_000,
            warn_at: float = 0.8) -> str:
     """Charge tokens before a call; warn once and stop before exceeding the limit."""
+    if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 0:
+        raise ValueError("token charge must be a non-negative integer")
     row = conn.execute("SELECT tokens_used, limit_tokens FROM budgets WHERE close_id=? AND agent=?", (close_id, agent)).fetchone()
     used, cap = (int(row["tokens_used"]), int(row["limit_tokens"])) if row else (0, limit)
     if used + tokens > cap:

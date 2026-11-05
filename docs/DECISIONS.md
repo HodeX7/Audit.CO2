@@ -19,3 +19,6 @@
 - Public emissions publications are represented only as pinned provenance beside fictional P1 test evidence, never as
   a production factor catalog. Why: source edition, geography, boundary, scope, and allocation method must be
   selected and owned by P2 before any customer-facing calculation can be valid. 2026-11-05
+- P1 readers reject symlinked, non-regular, and over-10 MiB sources before parsing. Why: ingestion must not follow a
+  caller-controlled filesystem link or allow one attachment to consume unbounded local resources. P3 owns the
+  managed Switch-attachment root and authenticated event boundary. 2026-11-05

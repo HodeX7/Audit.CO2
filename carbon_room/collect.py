@@ -104,10 +104,13 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
             return []
         source_id = next_id(conn, "SRC")
         period = parse_period("\n".join(pages)) if pages else None
-        candidates = [cloud.extract(source_path)] if kind == "cloud_invoice" and pages else _candidates(
-            pages, kind, source_path.name, digest, close_id, conn
-        )
-        valid, extraction_error = _validated_candidates(kind, pages, candidates) if pages else ([], result)
+        try:
+            candidates = [cloud.extract(source_path)] if kind == "cloud_invoice" and pages else _candidates(
+                pages, kind, source_path.name, digest, close_id, conn
+            )
+            valid, extraction_error = _validated_candidates(kind, pages, candidates) if pages else ([], result)
+        except ValueError as error:
+            valid, extraction_error = [], str(error)
         source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
                         period[0] if period else None, period[1] if period else None,
                         "OK" if valid else "FAILED", None if valid else str(extraction_error))

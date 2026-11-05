@@ -12,3 +12,5 @@ the production factor catalog.
 
 This is an integration-ready P1 deliverable, not a claim that the complete P2/P3 Switch workflow has shipped.
 P2 must add its contract-owned `config/carbon_room.yaml` factor-set catalog before P3 calls `start_close`.
+P3 must supply authenticated Switch identity, replay protection, and authorization before it calls any P1 mutation;
+that transport boundary is deliberately not implemented in this P1 branch.

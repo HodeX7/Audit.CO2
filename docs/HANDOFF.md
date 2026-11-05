@@ -29,6 +29,12 @@ Use `carbon_room.core` rather than reaching into P1 implementation modules:
   `carbon_room.llm.set_completion_provider`; P1 validates extracted evidence deterministically either way.
 - `tests/fixtures/emissions_reference/` is an offline P1 regression corpus. Its source metadata is test-only;
   P2 must not import it as production factors or use its national-grid references to calculate cloud allocations.
+- P3 must construct `Actor` values from authenticated Switch events; P1 treats them as already authenticated input
+  and cannot verify an arbitrary caller-provided identity. In particular, P3 must not trust a role, user id, or
+  `chat_message_id` supplied in message text. It must enforce webhook verification, event replay protection, room and
+  thread ownership, and authorization before invoking P1 mutations.
+- P3 must pass a managed regular attachment file, not an arbitrary path or symlink. P1 rejects non-regular and
+  symlinked files and limits an individual source to 10 MiB before parsing.
 
 `claim_lock` is an internal P1 primitive. It must be entered on a connection without an active transaction so its
 published lease is visible to competing SQLite workers; P2/P3 should use the public facade instead.
@@ -40,7 +46,8 @@ logic. Those remain P2/P3 responsibilities. P2/P3 should not bypass the ledger o
 function signatures without a documented cross-team contract change.
 
 P2 must treat factor IDs as immutable versioned catalog rows: load them before a close starts and create a new factor
-ID instead of overwriting a row referenced by a locked close. The current close-scoped audit chain cannot represent
+ID instead of overwriting a row referenced by a locked close; P1 rejects a changed repeat load. The current
+close-scoped audit chain cannot represent
 global factor-catalog bootstrap without a team-approved catalog-audit design.
 
 ## Verification before integration

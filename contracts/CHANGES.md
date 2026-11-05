@@ -19,7 +19,11 @@ The active contract implementation lives in `carbon_room/`.
   active close before looking up a repeated gap identifier. No P2/P3 implementation exists on this branch yet.
   The graph view represents this composite node as `<close_id>:<gap_id>` to keep graph edges unambiguous.
 - Factor loading remains the fixed global-catalog API `load_factors(conn, rows)`. P2 must load immutable,
-  versioned factor rows before starting a close and must not overwrite an existing factor id used by a close.
+  versioned factor rows before starting a close. P1 now rejects an attempt to change an existing factor id; repeat
+  loads of an identical row are safe. P2 must create a new factor id for a changed factor.
+- P1 readers reject symlinked, non-regular, or over-10 MiB source files before parsing. P3 must resolve a Switch
+  attachment into a managed upload directory before calling P1; an arbitrary filesystem path is not a valid room
+  attachment contract.
   A catalog-provenance/audit design needs team approval because the close-scoped `events` table cannot honestly
   represent a factor load performed before any close exists.
 - No public `carbon_room.core` signature changed.
