@@ -4,6 +4,8 @@ One line each: decision, why, date. Newest at the bottom of each owner's section
 
 ## Ujjwal (Ingestion & Ledger)
 
+- Contract alignment is additive: `carbon_room` starts alongside `carbonroom` while P2 and P3 migrate their imports. Why: the shared contract becomes available without silently breaking active teammate branches. 2026-11-04
+
 - The Switch integration uses thin `core` room helpers over the SQLite ledger. A supplied site on a room upload is only a close-boundary hint; document evidence decides the stored site and every upload message is audit-linked. Why: the room is load-bearing without becoming a second ledger. 2026-11-04
 
 - Quantities, factors and results are stored as decimal strings (TEXT), never floats. Why: deterministic math, no float drift. 2026-11-03

@@ -10,6 +10,7 @@ One file per shipped feature. Each one says **why** the feature exists, **how it
 | Ingestion (collect → extract with proof → consolidate) | [ingestion.md](ingestion.md) | `carbonroom/ingest/` |
 | Model provider layer | [llm.md](llm.md) | `carbonroom/llm.py` |
 | Background batch run (orchestrator / LangGraph) | [batch-run.md](batch-run.md) | `carbonroom/ingest/batch.py` |
+| Contract-compatible shared types | [contract-compatibility.md](contract-compatibility.md) | `carbon_room/models.py` |
 | Core API and the @collector agent | [core-and-collector.md](core-and-collector.md) | `carbonroom/core.py`, `carbonroom/agents/collector.py` |
 | Knowledge graph (lineage, impact, graph export; mirrored into Neo4j) | [knowledge-graph.md](knowledge-graph.md) | `carbonroom/ledger/graph.py`, `carbonroom/graphdb/` |
 
