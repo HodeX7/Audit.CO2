@@ -4,8 +4,7 @@ Owner: Ujjwal (P1). Code: `carbon_room/models.py`.
 
 ## Why
 
-The shared team contract names `carbon_room` as the boundary package. The existing `carbonroom` implementation
-continues to work during migration, while the contract-compatible package gives P2 and P3 stable imports.
+The shared team contract names `carbon_room` as the sole boundary package. P2 and P3 have one stable import path.
 
 ## Design
 
@@ -16,8 +15,8 @@ collection operations. P2's calculation, checks, and reporting methods remain ex
 
 ## Decisions
 
-The package is additive during migration. This avoids breaking P2/P3 branches that currently import `carbonroom`.
-The package-alignment proposal is `docs/proposals/001-contract-package-alignment.md`.
+The legacy implementation was retired before cross-team imports began. Keeping one package eliminates ambiguous
+schemas, duplicate commands, and accidental use of an obsolete ledger.
 
 ## Code map
 
@@ -36,4 +35,4 @@ The package-alignment proposal is `docs/proposals/001-contract-package-alignment
 
 Focused compatibility tests prove Decimal round-trips, schema uniqueness and idempotence, environment-overrideable
 site configuration, frozen function parameter names, repeat-safe seed ingestion, and human upload attribution. The
-legacy suite also runs unchanged.
+contract suite exercises the only supported runtime package.
