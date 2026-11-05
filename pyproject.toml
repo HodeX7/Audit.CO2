@@ -11,6 +11,7 @@ dependencies = [
     "pdfplumber>=0.11",
     "pyyaml>=6.0",
     "reportlab>=4.2",
+    "websockets>=12",
     "openai>=1.40",
     "python-dotenv>=1.0",
     "neo4j>=6,<7",
