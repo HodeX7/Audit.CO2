@@ -1,0 +1,20 @@
+sites:
+  - id: hq
+    name: HQ
+    country: US
+    grid: { source: EGRID, geography: CAMX }
+    owner: lead
+    expected: [ {kind: utility_pdf, activity: electricity_kwh}, {kind: email_invoice, activity: diesel_l} ]
+  - id: warehouse-2
+    name: Warehouse-2
+    country: GB
+    grid: { source: DEFRA, geography: UK }
+    owner: priya
+    expected: [ {kind: utility_pdf, activity: electricity_kwh} ]
+  - id: dc-eu-west
+    name: Data Centre EU-West
+    country: IE
+    grid: { source: EMBER, geography: IE }
+    owner: lead
+    expected: [ {kind: cloud_invoice, activity: dc_it_kwh} ]
+diesel_factor: { source: DEFRA, geography: UK }

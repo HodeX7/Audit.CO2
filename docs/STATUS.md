@@ -5,7 +5,8 @@ Each owner updates their own section: done / next / blocked.
 ## Ujjwal (Ingestion & Ledger), updated 2026-11-04 15:50 CT
 
 **Current P1 integration**
-- Contract-compliance migration started: frozen `carbon_room.models` shared types are implemented and round-trip tested.
+- Contract-compliance migration: shared types, frozen facade signatures, sites configuration and the independent
+  SQLite schema are implemented and tested. Next: contract ledger operations and audit chain.
 - Room-resume helpers and single-file room ingestion are implemented in `core.py`, including an audit-linked human `chat_message_id`.
 
 **Done**

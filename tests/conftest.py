@@ -64,3 +64,14 @@ def sites(conn):
 
     load_sites(conn, config.seed_dir() / "sites.json")
     return conn
+
+
+@pytest.fixture
+def db(tmp_path):
+    """Isolated contract-ledger database for tests that use the shared API."""
+    from carbon_room.ledger import connect, init_db
+
+    conn = connect(tmp_path / "carbon_room.db")
+    init_db(conn)
+    yield conn
+    conn.close()
