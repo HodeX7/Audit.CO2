@@ -8,7 +8,8 @@ Each owner updates their own section: done / next / blocked.
 - Contract-compliance migration: shared types, frozen facade signatures, sites configuration and the independent
   SQLite schema are implemented and tested. Contract ledger operations, audit chain, source foundations, and the
   P1 room-facing facade are now wired. The deterministic contract seed, end-to-end seed ingestion, idempotency,
-  and human upload message attribution are verified; next: final repository-wide compliance audit.
+  and human upload message attribution are verified. Trace, fact-safe explain, replay/model boundaries and the safe
+  developer CLI are implemented; the branch is ready for P2/P3 contract integration review.
 - Room-resume helpers and single-file room ingestion are implemented in `core.py`, including an audit-linked human `chat_message_id`.
 
 **Done**

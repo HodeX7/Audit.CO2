@@ -29,6 +29,7 @@ The package-alignment proposal is `docs/proposals/001-contract-package-alignment
 | `carbon_room/core.py` | Frozen facade signatures; P2 behavior remains explicitly unimplemented |
 | `carbon_room/collect.py`, `carbon_room/sources/` | P1 source ingestion, storage, readers and deterministic cloud mapping |
 | `scripts/make_seed.py`, `data/seed/2026-09/`, `data/seed/2026-10/` | Deterministic synthetic contract scenario and documented traps |
+| `carbon_room/explain.py`, `carbon_room/ledger/graph.py`, `carbon_room/__main__.py` | Fact-safe answers, ledger lineage, and safe developer commands |
 | `tests/test_contract_models.py`, `tests/test_schema.py`, `tests/test_config.py`, `tests/test_core_signatures.py` | Compatibility proof tests |
 
 ## Tests
