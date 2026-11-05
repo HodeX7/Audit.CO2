@@ -149,3 +149,13 @@ def test_committed_cache_covers_every_seed_document():
     for entry in manifest(seed):
         sha = sha256_file(seed / entry["path"])
         assert (seed / "extractions" / f"{sha}.json").exists(), entry["path"]
+
+
+def test_rows_carry_the_names_the_calculator_and_checker_read(seeded):
+    """Richa's conflict rule groups by extra.delivery_id; her data-centre line reads extra.pue and extra.wue."""
+    diesel = db.list_activities(seeded, period_id="2026-10", category="diesel")
+    assert {a["extra"]["delivery_id"] for a in diesel} == {"DLV-7731"}
+    assert {a["extra"]["delivery_id"] for a in diesel} == {a["extra"]["delivery_ref"] for a in diesel}
+    assert len({a["quantity"] for a in diesel}) == 2  # so the conflict fires
+    cloud = db.list_activities(seeded, period_id="2026-10", category="cloud_compute")[0]["extra"]
+    assert (cloud["pue"], cloud["wue"], cloud["wue_l_per_kwh"]) == ("1.35", "0.42", "0.42")

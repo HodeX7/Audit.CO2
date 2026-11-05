@@ -20,6 +20,9 @@ from carbonroom.ingest.extract import Extraction, Failure
 from carbonroom.ledger import db
 
 ACTOR = "cr-consolidator"
+# Extraction field -> the key Richa's calculator / checker read from activity extra (both are kept).
+# delivery_id groups invoices for one fuel delivery (conflict rule); wue is litres per IT kWh (data-centre line).
+CALC_FIELD_NAMES = {"delivery_ref": "delivery_id", "wue_l_per_kwh": "wue"}
 
 
 def _gap_detail(doc: dict[str, Any], ex: Extraction, failure: Failure) -> str:
@@ -93,6 +96,9 @@ def consolidate(
             }
             for name, vf in claim.fields.items():
                 extra[name] = vf.value
+            for ours, calc_name in CALC_FIELD_NAMES.items():  # the names Richa's calculator/checker read
+                if ours in claim.fields:
+                    extra[calc_name] = claim.fields[ours].value
             if superseded_docs:
                 extra["replaces_doc_ids"] = superseded_docs
                 extra["replaces_activity_ids"] = _replaced_activities(

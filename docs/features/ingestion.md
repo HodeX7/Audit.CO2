@@ -85,7 +85,9 @@ sequenceDiagram
   Manufacturing"), code uses the document's own line, but only if the whole document names exactly one known site.
   Two sites, or a disagreement, means rejected.
 - Extra fields per category, each verified the same way: diesel `delivery_ref`, `delivery_date`; cloud `pue`
-  (required), `wue_l_per_kwh`, `cloud_region`; electricity/gas `meter_id`; REC `certificate_id`, `region`, `vintage`
+  (required), `wue_l_per_kwh`, `cloud_region`; electricity/gas `meter_id`; REC `certificate_id`, `region`, `vintage`.
+  The consolidator also writes `delivery_id` (= `delivery_ref`) and `wue` (= `wue_l_per_kwh`), the names Richa's
+  conflict rule and data-centre line read (`carbonroom.ingest.consolidator.CALC_FIELD_NAMES`)
   (all required). An unproven field becomes its own gap, while the proven quantity is still recorded.
 
 ### Units (`carbonroom/ingest/units.py`)

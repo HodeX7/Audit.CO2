@@ -90,8 +90,9 @@ doc_ref                                         e.g. "INV-204B"
 proposer                                        "cache:llm:nvidia:nvidia/nemotron-3-ultra-550b-a55b" | "llm:<provider>:<model>" | "rules-v1"
 evidence{site, period, doc_ref, <field>}        each {excerpt, locator, excerpt_sha256}
 unverified_fields                               fields the document did not prove (each also has a gap)
-diesel:        delivery_ref ("DLV-7731"), delivery_date
-cloud_compute: pue ("1.35"), wue_l_per_kwh ("0.42"), cloud_region ("us-east-va")   <- quantity is IT kWh
+diesel:        delivery_ref ("DLV-7731"), delivery_date, delivery_id (= delivery_ref, the name calc/check read)
+cloud_compute: pue ("1.35"), wue_l_per_kwh ("0.42"), wue (= wue_l_per_kwh, the name calc/check read),
+               cloud_region ("us-east-va")   <- quantity is IT kWh
 electricity / natural_gas: meter_id
 corrected bills: replaces_doc_ids, replaces_activity_ids
 ```
@@ -101,7 +102,7 @@ corrected bills: replaces_doc_ids, replaces_activity_ids
 | Trap | What the ledger has after `carbonroom seed` | Suggested checker step |
 | --- | --- | --- |
 | 1 Missing bill | no Reno `2026-10` electricity; `db.expected_but_missing(conn, "2026-10")` returns it with owner `lena`, room `cr-site-reno` | `create_gap(kind="missing_doc", ..., dedupe_key=f"missing:{site}:{category}:{period}")` |
-| 2 Conflict | two Austin diesel rows for `2026-10`, both `extra["delivery_ref"] == "DLV-7731"`, 500 vs 550 gal, from INV-204 and INV-204B | group by `delivery_ref`; >1 distinct quantity → `kind="conflict"`, `refs={"activity_ids": [...]}` |
+| 2 Conflict | two Austin diesel rows for `2026-10`, both `extra["delivery_id"] == "DLV-7731"` (also `delivery_ref`), 500 vs 550 gal, from INV-204 and INV-204B | group by `delivery_id`; >1 distinct quantity → `kind="conflict"`, `refs={"activity_ids": [...]}` |
 | 3 Stale factor | (yours: factor sets) | compare the factor's `set_version` with `periods.factor_set_version` (`set_period_factor_set` locks it) |
 | 4 False done | after you mark the Austin Oct electricity row VERIFIED, `carbonroom ingest .../later/...ELB-AUS-2610-C.pdf` sets the original document's `superseded_by` and adds a new 196,800 kWh row with `replaces_activity_ids=[old id]`. **Ingestion leaves the old row as it is.** | `carbonroom.ingest.evidence.evidence_status(conn, activity_id)` → `source_superseded=True`, `excerpt_in_current_doc=False`, `replacement_activity_ids=[...]`. Reopen: `set_activity_status(old, "FLAGGED", reason=...)` + gap `excerpt_mismatch`; after Omar confirms: `supersede_activity(old, new, ...)` |
 | 5 Outlier | Austin gas 4,800 → 7,700 therms (+60.4%) | compare the same site/category across periods |
