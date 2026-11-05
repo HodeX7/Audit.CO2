@@ -26,6 +26,12 @@ Conventions written into the schema header:
   can't be closed without `resolved_by` + `resolution`; a period can't be `CLOSED` without a recorded
   `APPROVE` by the same handle.
 
+## 2026-11-04 - audit chain on `events` (Ujjwal) - PROPOSED, additive
+
+| Table | Added | Why |
+| --- | --- | --- |
+| `events` | `chat_message_id`, `prev_event_hash`, `event_hash`; trigger `events_hash_chain` | The architecture's "Audit chain: append-only, hashed" and its Event contract (`chat_message_id`, `prev_hash`, `hash`). Same hash column names as Richa's stand-in `carbonroom/db.py`. `event_hash` = sha256 of `[prev_event_hash or "", at, actor, action, ref or "", chat_message_id or "", detail_json]` as compact JSON. Older ledgers are hashed once by `migrate`. |
+
 ## 2026-11-04 - knowledge-graph views (Ujjwal) - PROPOSED, additive, read-only
 
 Two views added to `contracts/schema.sql`: `ledger_edges(src_type, src_id, rel, dst_type, dst_id, detail)` and

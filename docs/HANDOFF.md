@@ -29,12 +29,23 @@ is re-verified against its PDF on every run.
 - Rows come back as dicts. `*_json` columns are parsed and renamed: `aliases`, `meta`, `extra`, `refs`,
   `detail`; `quality_flags` is a list.
 - Every helper logs to `events`. Pass `actor=` as your agent name (`cr-checker`, `cr-reporter`, ...).
+- `events` is a hash chain (the "Audit chain" box). Write events only with
+  `log_event(conn, actor, action, ref, detail, chat_message_id=)`;
+  a raw `INSERT` without the right `prev_event_hash` is refused by the database. Richa: this replaces
+  `append_event(at=, actor=, action=, ref={...})` from the stand-in `carbonroom/db.py`: same column names
+  (`prev_event_hash`, `event_hash`); put the id the event is about in `ref` and the rest of your dict in `detail`.
+  Ids are integers (newest = highest), and `at` comes from the clock (`CR_NOW` pins it).
+  Architecture "Event" contract → columns: `event_id` = `id`, `actor`, `claim_id` = `ref` (or any other id the
+  event is about), `before_status`/`after_status`/`reason` = `detail["from"]`/`detail["to"]`/`detail["reason"]`
+  (what `set_activity_status` logs), `chat_message_id`, `timestamp` = `at`, `prev_hash` = `prev_event_hash`,
+  `hash` = `event_hash`.
 
 ### `carbonroom.ledger.db`: function list
 
 | Area | Functions |
 | --- | --- |
 | Connection | `connect(path=None, create=True)`, `init_db`, `migrate`, `transaction(conn)`, `reset_db_file`, `log_event`, `list_events` |
+| Audit chain | `event_hash(prev_event_hash, at, actor, action, ref, chat_message_id, detail_json)`, `audit_head(conn)` → newest `{id, at, actor, action, event_hash}`, `verify_audit_chain(conn)` → `{ok, events, broken, head, problems}` |
 | Values / ids | `dec`, `dec_str`, `sha256_text`, `dumps`, `loads`, `row_to_dict`, `make_doc_id`, `make_activity_id`, `make_instrument_id`; constants `ACTIVITY_STATUSES`, `ALLOWED_TRANSITIONS`, `GAP_KINDS`, `GAP_STATUSES`, `DOC_KINDS`; exception `LedgerError` |
 | Sites / periods | `upsert_site`, `get_site`, `list_sites`, `match_sites`, `ensure_period`, `get_period`, `list_periods`, `set_period_factor_set`, `close_period(conn, period, approved_by=, actor=)` |
 | Expected evidence | `upsert_expected_document`, `list_expected_documents`, `expected_but_missing(conn, period)` |

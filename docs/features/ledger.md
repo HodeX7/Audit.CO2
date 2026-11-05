@@ -27,7 +27,7 @@ knowledge graph ([knowledge-graph.md](knowledge-graph.md)). One file, `CR_DB_PAT
 | `instruments` | RECs/PPAs with the same proof as activities; `quality_flags` set by the checker |
 | `gaps` | `GAP-###` problems with a named owner and room; closed only by a human with a written resolution |
 | `approvals` | human APPROVE/REJECT decisions, append-only |
-| `events` | append-only audit log of every write |
+| `events` | append-only audit log of every write: who, what, about which id, from which chat message (`chat_message_id`); hash-chained (`prev_event_hash`, `event_hash`) |
 | `expected_documents` | which evidence each site must send (`monthly` / `as_delivered`), for missing-bill detection |
 | `ledger_edges` (view) | every link between rows, as a typed edge: the [knowledge graph](knowledge-graph.md) |
 | `ledger_nodes` (view) | every row (plus people, rooms, runs) as a graph node with a label |
@@ -53,6 +53,7 @@ flowchart LR
   T -->|UPDATE events / approvals / calculations| X3[abort: append-only]
   T -->|gap -> RESOLVED without resolved_by + resolution| X4[abort]
   T -->|period -> CLOSED without that approver's APPROVE| X5[abort]
+  T -->|INSERT event not chained onto the newest event| X7[abort: write events with log_event]
   T -->|status SUPERSEDED without superseded_by, or leaving SUPERSEDED| X6[abort]
 ```
 
@@ -60,13 +61,30 @@ Status rules (`carbonroom.ledger.db.ALLOWED_TRANSITIONS`): new activities are al
 moves them to `VERIFIED` or `FLAGGED`; `VERIFIED → FLAGGED` is the "false done" reopen; `EXCLUDED` and `FLAGGED`
 need a reason; `SUPERSEDED` is reached only through `carbonroom.ledger.db.supersede_activity` and is final.
 
+### Audit chain (hashed)
+
+Every event stores the hash of the event before it: `event_hash` = sha256 of the compact JSON array
+`[prev_event_hash or "", at, actor, action, ref or "", chat_message_id or "", detail_json]` (`carbonroom.ledger.db.event_hash`).
+Editing, removing or reordering any past event breaks every link after it, and
+`carbonroom.ledger.db.verify_audit_chain` (run by `carbonroom ledger verify`) names the first broken event.
+Re-hashing a forged event doesn't help: the next event still points at the old hash.
+
+- `carbonroom.ledger.db.log_event` reads the newest hash and inserts inside one `BEGIN IMMEDIATE`, so
+  agents writing at the same time line up instead of forking the chain. The `events_hash_chain` trigger
+  refuses any insert (even raw SQL) that does not extend the newest event.
+- A chain is only as strong as a copy of its head kept elsewhere: post `carbonroom.ledger.db.audit_head`
+  in the room at each close step. Anyone holding that hash can later prove nothing before it changed.
+- Older ledgers: `migrate` hashes events that have no hash yet, in id order, once (and logs
+  `audit_chain_backfilled`). It never rewrites an event or an existing hash.
+
 Concurrency: WAL mode, 30 s busy timeout, writes inside `BEGIN IMMEDIATE` (`carbonroom.ledger.db.transaction`),
 which joins an outer transaction if one is open. Several agents can share the file.
 
 ## Decisions
 
 See `docs/DECISIONS.md` (Ujjwal): decimal strings; guards as triggers; additive columns listed in
-`contracts/CHANGES.md`; `expected_documents`; cloud as a `sites` row; reset by removing the file, never SQL DELETE.
+`contracts/CHANGES.md`; `expected_documents`; cloud as a `sites` row; reset by removing the file, never SQL DELETE;
+the audit chain (hash per event, `chat_message_id` inside the hash, enforced by a trigger, backfilled once).
 
 ## Code map
 
@@ -82,6 +100,9 @@ See `docs/DECISIONS.md` (Ujjwal): decimal strings; guards as triggers; additive 
 | `carbonroom.ledger.db.close_period` | close a month (the database checks the approval) |
 | `carbonroom.ledger.db.expected_but_missing` | monthly evidence with no live row yet |
 | `carbonroom.ledger.db.export_period` | the whole month as `cr.ledger.v1` JSON |
+| `carbonroom.ledger.db.log_event` | append one event to the audit chain (under the write lock) |
+| `carbonroom.ledger.db.verify_audit_chain` | recompute every link; name the first broken event |
+| `carbonroom.ledger.db.audit_head` | the newest event's hash, to post in the room |
 
 The full function list is in `docs/HANDOFF.md`.
 
@@ -90,6 +111,11 @@ The full function list is in `docs/HANDOFF.md`.
 `tests/test_ledger_db.py`: DELETE refused on every table; evidence immutable; transitions; supersede keeps both
 rows and is final; floats refused; gap ids, dedupe and human-only resolution; close needs that approver's
 APPROVE; events/approvals/calculations append-only; and a scan proving the code contains no SQL `DELETE FROM`.
+
+`tests/test_audit_chain.py`: every event links to the one before and verifies; the chat message id is inside
+the hash; an edited, re-hashed or removed event is found where it happened; raw inserts that don't extend the
+newest event are refused; four agents writing at once never fork the chain; an older ledger is hashed once and
+keeps its append-only guard; `carbonroom ledger verify` reports the chain and exits 1 when it's broken.
 
 ## Commands
 
@@ -101,7 +127,7 @@ APPROVE; events/approvals/calculations append-only; and a scan proving the code 
 | `carbonroom ledger gaps` | `--period`, `--status`, `--json` |
 | `carbonroom ledger missing` | `--period` (required), `--json` |
 | `carbonroom ledger events` | `--limit` (default 40), `--ref ID`, `--json` |
-| `carbonroom ledger verify` | `--period`, `--verbose` / `-v`; exits 1 if any file or excerpt fails |
+| `carbonroom ledger verify` | `--period`, `--verbose` / `-v`; also checks the audit chain; exits 1 if any file, excerpt or chain link fails |
 
 ## How to use
 
@@ -109,7 +135,7 @@ APPROVE; events/approvals/calculations append-only; and a scan proving the code 
 uv run carbonroom init                         # empty ledger
 uv run carbonroom ledger show --period 2026-10 # after seeding
 uv run carbonroom ledger export --period 2026-10 --json
-uv run carbonroom ledger verify                # re-hash every document, re-find every excerpt
+uv run carbonroom ledger verify                # re-hash every document, re-find every excerpt, check the audit chain
 uv run carbonroom ledger gaps --period 2026-10 --status OPEN
 uv run carbonroom ledger events --limit 20     # the audit log
 ```

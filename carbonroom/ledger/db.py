@@ -171,7 +171,11 @@ def _refresh_graph_views(conn: sqlite3.Connection) -> bool:
 
 
 # Additive columns added after schema v1 go here as (table, column, DDL type clause).
-_ADDITIVE_COLUMNS: list[tuple[str, str, str]] = []
+_ADDITIVE_COLUMNS: list[tuple[str, str, str]] = [
+    ("events", "chat_message_id", "TEXT"),
+    ("events", "prev_event_hash", "TEXT"),
+    ("events", "event_hash", "TEXT"),
+]
 
 
 def migrate(conn: sqlite3.Connection) -> list[str]:
@@ -189,7 +193,38 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
     )
     if _refresh_graph_views(conn):
         applied.append(f"graph views v{GRAPH_VERSION}")
+    hashed = _backfill_event_chain(conn)
+    if hashed:
+        applied.append(f"audit chain: hashed {hashed} older event(s)")
     return applied
+
+
+def _backfill_event_chain(conn: sqlite3.Connection) -> int:
+    """Hash events written before the audit chain existed. Fills only empty hash columns, in id order,
+    chaining onto the stored hash of the event before; never rewrites an event or an existing hash."""
+    if conn.execute("SELECT 1 FROM events WHERE event_hash IS NULL LIMIT 1").fetchone() is None:
+        return 0
+    guard = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'events_append_only'"
+                         ).fetchone()
+    filled = 0
+    with transaction(conn):
+        if guard:
+            conn.execute("DROP TRIGGER events_append_only")  # put back below, in the same transaction
+        prev: str | None = None
+        for row in conn.execute("SELECT * FROM events ORDER BY id").fetchall():
+            if row["event_hash"] is None:
+                link = event_hash(prev, row["at"], row["actor"], row["action"], row["ref"], row["chat_message_id"],
+                                  row["detail_json"])
+                conn.execute("UPDATE events SET prev_event_hash = ?, event_hash = ? WHERE id = ?",
+                             (prev, link, row["id"]))
+                prev = link
+                filled += 1
+            else:
+                prev = row["event_hash"]
+        if guard:
+            conn.execute(guard["sql"])
+        log_event(conn, "cr-ledger", "audit_chain_backfilled", None, {"events": filled})
+    return filled
 
 
 def reset_db_file(path: str | Path | None = None) -> Path:
@@ -218,18 +253,69 @@ def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
         conn.execute("COMMIT")
 
 
+def event_hash(prev_event_hash: str | None, at: str, actor: str, action: str, ref: str | None,
+               chat_message_id: str | None, detail_json: str) -> str:
+    """One link of the audit chain. Anyone can recompute it from an exported event row."""
+    payload = [prev_event_hash or "", at, actor, action, ref or "", chat_message_id or "", detail_json]
+    return sha256_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+
+
 def log_event(
     conn: sqlite3.Connection,
     actor: str,
     action: str,
     ref: str | None = None,
     detail: dict[str, Any] | None = None,
+    *,
+    chat_message_id: str | None = None,
 ) -> int:
-    cur = conn.execute(
-        "INSERT INTO events(at, actor, action, ref, detail_json) VALUES (?, ?, ?, ?, ?)",
-        (config.now_iso(), actor, action, ref, dumps(detail or {})),
-    )
+    """Append one event to the audit chain. `actor` is who did it: an agent ('cr-collector') or a human;
+    `chat_message_id` is the Switch message that caused it (required for human actions, see close rules)."""
+    at, detail_json = config.now_iso(), dumps(detail or {})
+    with transaction(conn):  # holds the write lock between reading the newest hash and inserting
+        row = conn.execute("SELECT event_hash FROM events ORDER BY id DESC LIMIT 1").fetchone()
+        prev = row["event_hash"] if row else None
+        cur = conn.execute(
+            "INSERT INTO events(at, actor, action, ref, detail_json, chat_message_id, prev_event_hash, event_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (at, actor, action, ref, detail_json, chat_message_id, prev,
+             event_hash(prev, at, actor, action, ref, chat_message_id, detail_json)),
+        )
     return int(cur.lastrowid)
+
+
+def audit_head(conn: sqlite3.Connection) -> dict | None:
+    """The newest event and its hash. Post it in the room at each close step: anyone can later prove
+    the log up to that point was not changed (verify_audit_chain + the posted hash)."""
+    row = conn.execute("SELECT id, at, actor, action, event_hash FROM events ORDER BY id DESC LIMIT 1").fetchone()
+    return dict(row) if row else None
+
+
+def verify_audit_chain(conn: sqlite3.Connection, *, max_problems: int = 20) -> dict[str, Any]:
+    """Recompute every link. Returns {ok, events, head, problems: [{id, problem}]}; the first problem
+    is where the log was changed (every link after it breaks too, so only the first few are listed)."""
+    problems: list[dict[str, Any]] = []
+    prev: str | None = None
+    count = 0
+    last = None
+    broken = 0
+    for row in conn.execute("SELECT * FROM events ORDER BY id"):
+        count += 1
+        last = row
+        found = []
+        if row["prev_event_hash"] != prev:
+            found.append("prev_event_hash does not match the event before")
+        expected = event_hash(row["prev_event_hash"], row["at"], row["actor"], row["action"], row["ref"],
+                              row["chat_message_id"], row["detail_json"])
+        if row["event_hash"] != expected:
+            found.append("event_hash does not match the event's content")
+        if found:
+            broken += 1
+            if len(problems) < max_problems:
+                problems.append({"id": row["id"], "problem": "; ".join(found)})
+        prev = row["event_hash"]
+    head = {"id": last["id"], "event_hash": last["event_hash"]} if last is not None else None
+    return {"ok": broken == 0, "events": count, "broken": broken, "head": head, "problems": problems}
 
 
 def list_events(conn: sqlite3.Connection, *, limit: int = 50, ref: str | None = None) -> list[dict]:

@@ -150,13 +150,20 @@ CREATE TABLE IF NOT EXISTS approvals (
   at              TEXT NOT NULL
 );
 
+-- Audit chain: every event carries the hash of the event before it, so editing, removing or
+-- reordering any past event breaks every hash after it (`carbonroom ledger verify` finds where).
+-- event_hash = sha256 of the compact JSON array [prev_event_hash or "", at, actor, action, ref or "",
+-- chat_message_id or "", detail_json] (carbonroom.ledger.db.event_hash). Write events only with log_event().
 CREATE TABLE IF NOT EXISTS events (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  at          TEXT NOT NULL,
-  actor       TEXT NOT NULL,
-  action      TEXT NOT NULL,
-  ref         TEXT,
-  detail_json TEXT NOT NULL DEFAULT '{}'          -- additive
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  at              TEXT NOT NULL,
+  actor           TEXT NOT NULL,
+  action          TEXT NOT NULL,
+  ref             TEXT,
+  detail_json     TEXT NOT NULL DEFAULT '{}',     -- additive: before/after status, reason, other details
+  chat_message_id TEXT,                           -- additive: the Switch message that caused this (human actions need one)
+  prev_event_hash TEXT,                           -- additive: event_hash of the previous event (NULL for the first)
+  event_hash      TEXT                            -- additive: this event's link in the audit chain
 );
 
 -- Additive: which evidence each site is expected to provide, so a missing bill is detectable.
@@ -251,6 +258,13 @@ WHEN NEW.id IS NOT OLD.id OR NEW.period_id IS NOT OLD.period_id OR NEW.kind IS N
   OR NEW.source_doc_id IS NOT OLD.source_doc_id OR NEW.excerpt IS NOT OLD.excerpt
   OR NEW.excerpt_locator IS NOT OLD.excerpt_locator OR NEW.excerpt_sha256 IS NOT OLD.excerpt_sha256
 BEGIN SELECT RAISE(ABORT, 'carbonroom: instrument evidence is immutable (supersede instead)'); END;
+
+-- Audit chain: a new event must name the newest event's hash as its prev_event_hash. Blocks unhashed
+-- inserts and forks (two writers chaining onto the same event) even from raw SQL.
+CREATE TRIGGER IF NOT EXISTS events_hash_chain BEFORE INSERT ON events
+WHEN NEW.event_hash IS NULL OR length(NEW.event_hash) != 64
+  OR NEW.prev_event_hash IS NOT (SELECT event_hash FROM events ORDER BY id DESC LIMIT 1)
+BEGIN SELECT RAISE(ABORT, 'carbonroom: events form a hash chain; write them with log_event()'); END;
 
 -- A recorded calculation is never rewritten; recompute by inserting a new row.
 CREATE TRIGGER IF NOT EXISTS calculations_append_only BEFORE UPDATE ON calculations

@@ -18,6 +18,7 @@ Each owner updates their own section: done / next / blocked.
 - Background batch run for the orchestrator: parallel, one final summary, `collect_node` for LangGraph
 - Knowledge graph: live graph views, `ledger trace` (where did this number come from?), `ledger impact` (what depends on this bill?), `ledger graph` (Mermaid/JSON)
 - Same graph mirrored into Neo4j (graph database), auto-synced: `graphdb why` / `conflicts` / `gaps` / `find` / read-only `query`, `infra/neo4j/docker-compose.yml`. `graphdb selftest` against live Neo4j 2026.07.1 (Docker, macOS): 14/14 passed, 2026-11-04
+- Audit chain: events hash-chained with the Switch `chat_message_id` inside each hash; `ledger verify` checks it (`tests/test_audit_chain.py`)
 - LLM: `nvidia/nemotron-3-ultra-550b-a55b`, bench 13/13 exact (backup `nvidia/nemotron-3.5-bolt-e4b`, also 13/13); seed extractions re-saved with it
 
 **Next**

@@ -432,7 +432,15 @@ def cmd_ledger_verify(args) -> int:
             problems += 1
         if not ok or args.verbose:
             print(f"{'OK  ' if ok else 'FAIL'} {a['id']} {a['excerpt_locator']} of {doc['path']}: {a['excerpt']}")
+    chain = db.verify_audit_chain(conn)
     conn.close()
+    for p in chain["problems"]:
+        print(f"FAIL event {p['id']}: {p['problem']}")
+    head = chain["head"]
+    print(f"{'OK  ' if chain['ok'] else 'FAIL'} audit chain: {chain['events']} events"
+          + (f", {chain['broken']} broken link(s)" if chain["broken"] else "")
+          + (f", head #{head['id']} {head['event_hash'][:16]}" if head and head["event_hash"] else ""))
+    problems += chain["broken"]
     print(f"{checked} activities checked, {problems} problem(s)")
     return 1 if problems else 0
 
