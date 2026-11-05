@@ -21,10 +21,16 @@ def main() -> int:
     close.add_argument("--factor-set", required=True)
     ingest = command.add_parser("ingest")
     ingest.add_argument("close_id")
+    for name in ("calculate", "check", "summary"):
+        item = command.add_parser(name)
+        item.add_argument("close_id")
     audit = command.add_parser("verify-audit")
     audit.add_argument("close_id")
     gaps = command.add_parser("gaps")
     gaps.add_argument("close_id")
+    trace = command.add_parser("trace")
+    trace.add_argument("close_id")
+    trace.add_argument("tag")
     args = parser.parse_args()
     actor = Actor("system", "cli", "CLI")
     if args.command == "init":
@@ -40,6 +46,10 @@ def main() -> int:
     elif args.command == "gaps":
         with connect() as db:
             print([asdict(item) for item in ledger.get_gaps(db, args.close_id)])
+    elif args.command in {"calculate", "check", "summary"}:
+        print(getattr(core, args.command)(args.close_id))
+    elif args.command == "trace":
+        print(core.trace(args.close_id, args.tag))
     return 0
 
 

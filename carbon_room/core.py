@@ -118,9 +118,7 @@ def budget_usage(close_id):
 
 def explain(close_id, question, actor):
     """P1 implementation: phrase only verified ledger facts or UNKNOWN."""
+    from carbon_room import explain as explainer
+
     with connect() as db:
-        claims = [claim for claim in ledger.get_claims(db, close_id) if claim.status == "VERIFIED"]
-    if not claims:
-        return "UNKNOWN for this close, because no VERIFIED ledger rows match, owned by lead"
-    facts = "; ".join(f"{claim.site}: {claim.value} {claim.unit} ({claim.activity})" for claim in claims)
-    return f"Verified ledger facts: {facts}"
+        return explainer.answer(db, close_id, question, actor)
