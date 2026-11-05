@@ -10,8 +10,11 @@ from pathlib import Path
 from carbon_room import config
 from carbon_room.ledger import ledger
 from carbon_room.ledger.ids import next_id
+from carbon_room.ledger.locks import claim_lock
 from carbon_room.models import Actor, Claim, IngestReport, Source
+from carbon_room.sources import cache
 from carbon_room.sources import cloud
+from carbon_room.sources import extract as model_extract
 from carbon_room.sources.period import parse_period
 from carbon_room.sources.readers import read
 from carbon_room.sources.store import store_file
@@ -40,6 +43,28 @@ def _candidate(pages: list[str]) -> dict | None:
             "unit": unit, "excerpt": match.group(0), "page": 0, "attributes": {}}
 
 
+def _mode() -> str:
+    """Use P2 configuration when available; deterministic rules remain the offline default."""
+    try:
+        return str(config.load_config().get("llm", {}).get("mode", "rules"))
+    except FileNotFoundError:
+        return "rules"
+
+
+def _candidates(pages: list[str], kind: str, file_name: str, digest: str, close_id: str) -> list[dict]:
+    if kind == "cloud_invoice":
+        return []
+    mode = _mode()
+    if mode == "replay":
+        return cache.load(digest)
+    if mode == "live":
+        candidates = model_extract.extract(pages, kind, file_name, close_id=close_id)
+        cache.save(digest, candidates)
+        return candidates
+    candidate = _candidate(pages)
+    return [candidate] if candidate else []
+
+
 def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None,
                 month_from_period: bool = False) -> list[str]:
     """Store, read and record one source; source text, not a model, is the proof boundary."""
@@ -55,15 +80,18 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
     period = parse_period("\n".join(pages)) if pages else None
     source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
                     period[0] if period else None, period[1] if period else None, "OK" if pages else "FAILED", result if isinstance(result, str) else None)
-    ledger.add_source(conn, source, actor)
-    candidate = cloud.extract(source_path) if kind == "cloud_invoice" and pages else _candidate(pages)
-    if candidate is None or not pages or (kind != "cloud_invoice" and not validate(candidate, pages)[0]):
-        return []
-    claim_month = period[0][:7] if month_from_period and period else close["month"]
-    claim = Claim(next_id(conn, "CL"), close_id, resolved_site, claim_month, candidate["activity"], Decimal(str(candidate["value"])),
-                  candidate["unit"], "DC" if candidate["activity"] == "dc_it_kwh" else "2", source_id, candidate["excerpt"], digest,
-                  candidate["page"], None, None, "UNVERIFIED", actor.id, None, None, candidate.get("attributes", {}))
-    return [ledger.add_claim(conn, claim, actor)]
+    with claim_lock(conn, close_id, resolved_site, close["month"], source_id, actor.id):
+        ledger.add_source(conn, source, actor)
+        candidates = [cloud.extract(source_path)] if kind == "cloud_invoice" and pages else _candidates(pages, kind, source_path.name, digest, close_id)
+        valid = [candidate for candidate in candidates if kind == "cloud_invoice" or validate(candidate, pages)[0]]
+        claim_month = period[0][:7] if month_from_period and period else close["month"]
+        claim_ids = []
+        for candidate in valid:
+            claim = Claim(next_id(conn, "CL"), close_id, resolved_site, claim_month, candidate["activity"], Decimal(str(candidate["value"])),
+                          candidate["unit"], "DC" if candidate["activity"] == "dc_it_kwh" else "2", source_id, candidate["excerpt"], digest,
+                          candidate["page"], None, None, "UNVERIFIED", actor.id, None, None, candidate.get("attributes", {}))
+            claim_ids.append(ledger.add_claim(conn, claim, actor))
+        return claim_ids
 
 
 def ingest(conn: sqlite3.Connection, close_id: str, actor: Actor) -> IngestReport:
