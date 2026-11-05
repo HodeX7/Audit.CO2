@@ -470,6 +470,23 @@ def cmd_ledger_verify(args) -> int:
 # ---------------------------------------------------------------------------
 
 
+def cmd_llm_budget(args) -> int:
+    from carbonroom import budgets
+
+    conn = _connect(args)
+    rows = budgets.report(conn, args.close)
+    conn.close()
+    if args.json:
+        _print_json(rows)
+        return 0
+    for r in rows:
+        state = " EXHAUSTED" if r["exhausted"] else (" warned" if r["warned"] else "")
+        print(f"{r['agent']:<16} {r['tokens']:>9,} of {r['cap']:,} tokens ({r['calls']} calls){state}")
+    if not rows:
+        print(f"no model calls charged to {args.close}")
+    return 0
+
+
 def _use_provider(args) -> None:
     """`--provider X` on any llm command = LLM_PROVIDER=X for this run only."""
     import os
@@ -802,7 +819,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("seed", help="reset the ledger and load the fictional seed company (minus held-back docs)")
     p.add_argument("--regenerate-docs", action="store_true", help="rebuild the seed PDFs first")
     p.add_argument("--with-later", action="store_true", help="also load the held-back documents")
-    p.add_argument("--proposer", choices=["auto", "rules", "llm"], help="default: CR_PROPOSER or auto")
+    p.add_argument("--proposer", choices=["auto", "rules", "llm", "replay"], help="default: CR_PROPOSER or auto")
     p.add_argument("--refresh-cache", action="store_true", help="ignore cached extractions")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_seed)
@@ -814,7 +831,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--thread", help="chat thread id (kept with the document)")
     p.add_argument("--message", help="chat message id")
     p.add_argument("--gap", help="gap id this upload answers (e.g. GAP-012)")
-    p.add_argument("--proposer", choices=["auto", "rules", "llm"])
+    p.add_argument("--proposer", choices=["auto", "rules", "llm", "replay"])
     p.add_argument("--refresh-cache", action="store_true")
     p.add_argument("--move-processed", action="store_true", help="move inbox files to data/inbox/_processed")
     p.add_argument("--watch", action="store_true", help="keep polling the inbox")
@@ -829,7 +846,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("extract", help="dry run: propose + verify a file without writing to the ledger")
     p.add_argument("paths", nargs="+")
-    p.add_argument("--proposer", choices=["auto", "rules", "llm"])
+    p.add_argument("--proposer", choices=["auto", "rules", "llm", "replay"])
     p.add_argument("--refresh-cache", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_extract)
@@ -915,6 +932,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--models", help="comma-separated model ids")
     p.add_argument("--verbose", "-v", action="store_true")
     p.set_defaults(func=cmd_llm_bench)
+    p = llm_p.add_parser("budget", help="tokens each agent spent on a close, against its cap")
+    p.add_argument("--close", required=True, help="close id, e.g. CLOSE-2026-10-v1")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_llm_budget)
 
     gdb = sub.add_parser("graphdb", help="the knowledge graph in Neo4j (graph database)").add_subparsers(
         dest="graphdb_cmd", required=True)

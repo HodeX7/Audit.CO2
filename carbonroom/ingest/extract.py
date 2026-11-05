@@ -339,13 +339,15 @@ def propose(
     mode: str = "auto",
     refresh: bool = False,
 ) -> Proposed:
-    """mode: auto (cache -> llm if a key is set -> rules), llm, rules."""
-    if mode not in ("auto", "llm", "rules"):
+    """mode: auto (cache -> llm if a key is set -> rules), llm, rules, replay (cache only: no model, no rules)."""
+    if mode not in ("auto", "llm", "rules", "replay"):
         raise ValueError(f"unknown proposer mode {mode!r}")
-    if not refresh:
+    if not refresh or mode == "replay":
         cached = load_cached(sha256)
         if cached:
             return Proposed(cached["proposal"], f"cache:{cached['proposer']}", True)
+    if mode == "replay":  # reproducible runs: what isn't cached is not extracted (and becomes a gap)
+        return Proposed({}, "replay", False, ["not in the replay cache (CR_PROPOSER=replay); nothing extracted"])
     notes: list[str] = []
     if mode in ("auto", "llm"):
         if llm.is_configured(task="extract"):

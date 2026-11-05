@@ -21,6 +21,7 @@ serialize the writes.
 
 from __future__ import annotations
 
+import contextvars
 import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -103,9 +104,11 @@ def run_batch(
         except Exception as exc:  # noqa: BLE001 - one bad file must not stop a background run
             return None, f"{type(exc).__name__}: {exc}"
 
-    # 2. parallel prepare; map() keeps input order, so 3. commits in a fixed order
+    # 2. parallel prepare; map() keeps input order, so 3. commits in a fixed order. Each worker runs in a copy
+    #    of this thread's context, so a token budget (llm.budget_scope) set by the caller also covers them.
+    parent = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        for inc, (prep, err) in zip(todo, pool.map(_prepare, todo)):
+        for inc, (prep, err) in zip(todo, pool.map(lambda i: parent.copy().run(_prepare, i), todo)):
             if err is None:
                 try:
                     result = pipeline.commit(conn, prep)

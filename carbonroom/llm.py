@@ -15,9 +15,14 @@ setting can be overridden per task: LLM_MODEL_EXTRACT, LLM_PROVIDER_EXTRACT, ...
 document extraction; teammates may use their own task names). A provider that does not speak this API
 can be plugged in with register_provider(..., client_factory=...).
 
-The model only PROPOSES extracted fields. It never does arithmetic, and code accepts a proposal only
-after the excerpt is found in the document (carbonroom/ingest/extract.py) - which is what makes it safe
-to swap models.
+The model is used in exactly two places (the architecture's "Model adapter: extract, phrase only"):
+  extract  propose fields from a document; code accepts a proposal only after the excerpt is found in the
+           document (carbonroom/ingest/extract.py)
+  phrase   reword a message built from ledger data (phrase() below); refused if any number, id or @handle
+           changes, so the model can't invent or alter a fact
+It never does arithmetic or decides a status - which is what makes it safe to swap models. Every call can be
+charged to a token budget per agent per close (Budget / budget_scope; carbonroom/budgets.py keeps the tally
+in the ledger).
 
 Sources: NVIDIA NIM FAQ (about 40 requests/minute, 429 + Retry-After); Claude docs "OpenAI SDK
 compatibility" (temperature < 1 and response_format=json_object are rejected on recent models);
@@ -27,17 +32,19 @@ OpenRouter docs (base URL https://openrouter.ai/api/v1); Ollama "OpenAI compatib
 
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from carbonroom import config
 
 TASK_OVERRIDE_FIELDS = ("PROVIDER", "MODEL", "BASE_URL", "API_KEY", "TEMPERATURE")
-KNOWN_TASKS = ("extract",)
+KNOWN_TASKS = ("extract", "phrase")
 NO_KEY = "not-needed"  # the openai client requires a non-empty key even for local servers
 
 
@@ -104,6 +111,69 @@ UNAVAILABLE_STATUS = {401, 403, 404, 410}
 
 class LLMNotConfigured(LLMError):
     pass
+
+
+class BudgetExceeded(LLMError):
+    """This agent has spent its token budget for this close; callers fall back (rules, plain text)."""
+
+
+class Budget:
+    """Tokens one agent may spend on one close: warn once at `warn_at` of the cap, refuse calls at the cap.
+
+    `used` starts from what was already spent (the ledger's tally); `record(tokens, info, warn, exhausted)` is
+    called after every charge so the spend is persisted. Shared safely by worker threads."""
+
+    def __init__(self, agent: str, close_id: str | None, cap: int, *, used: int = 0, warn_at: float = 0.8,
+                 record: Callable[[int, dict[str, Any], bool, bool], None] | None = None):
+        self.agent, self.close_id, self.cap, self.used, self.warn_at = agent, close_id, int(cap), int(used), warn_at
+        self.warned = self.used >= self.cap * warn_at
+        self._record = record
+        self._lock = threading.Lock()
+
+    @property
+    def remaining(self) -> int:
+        return max(0, self.cap - self.used)
+
+    def check(self) -> None:
+        with self._lock:
+            if self.used >= self.cap:
+                raise BudgetExceeded(f"{self.agent} has used {self.used:,} of {self.cap:,} tokens for "
+                                     f"{self.close_id or 'this close'}; no more model calls")
+
+    def charge(self, tokens: int, info: dict[str, Any]) -> None:
+        with self._lock:
+            self.used += int(tokens)
+            warn = not self.warned and self.used >= self.cap * self.warn_at
+            self.warned = self.warned or warn
+            exhausted = self.used >= self.cap
+        if self._record:
+            self._record(int(tokens), info, warn, exhausted)
+
+
+_BUDGET: contextvars.ContextVar[Budget | None] = contextvars.ContextVar("carbonroom_llm_budget", default=None)
+
+
+@contextmanager
+def budget_scope(budget: Budget | None) -> Iterator[Budget | None]:
+    """Charge every model call made inside this block (this thread / task) to `budget`."""
+    token = _BUDGET.set(budget)
+    try:
+        yield budget
+    finally:
+        _BUDGET.reset(token)
+
+
+def current_budget() -> Budget | None:
+    return _BUDGET.get()
+
+
+def _tokens_used(resp: Any, messages: list[dict[str, Any]], text: str) -> int:
+    usage = getattr(resp, "usage", None)
+    total = getattr(usage, "total_tokens", None) if usage is not None else None
+    if isinstance(total, int) and total > 0:
+        return total
+    chars = sum(len(str(m.get("content", ""))) for m in messages) + len(text)
+    return max(1, chars // 4)  # provider didn't report usage: about 4 characters per token
 
 
 @dataclass(frozen=True)
@@ -231,6 +301,9 @@ def chat(
     import openai
 
     p = provider(model, task=task)
+    budget = _BUDGET.get()
+    if budget is not None:
+        budget.check()
     cli = client or _client(p)
     attempts = attempts or int(config.env("CR_LLM_ATTEMPTS", "3"))
     kwargs: dict[str, Any] = {"model": p.model, "messages": messages, "max_tokens": max_tokens}
@@ -241,7 +314,11 @@ def chat(
         limiter().wait()
         try:
             resp = cli.chat.completions.create(**kwargs)
-            return (resp.choices[0].message.content or ""), p
+            text = resp.choices[0].message.content or ""
+            if budget is not None:
+                budget.charge(_tokens_used(resp, messages, text), {"task": task, "model": p.model,
+                                                                    "provider": p.name})
+            return text, p
         except (openai.RateLimitError, openai.APIConnectionError, openai.APITimeoutError,
                 openai.InternalServerError) as exc:
             last = exc
@@ -302,6 +379,72 @@ def _error_detail(exc: Exception) -> str:
             if body.get(key):
                 return str(body[key])[:240]
     return str(getattr(exc, "message", exc))[:240]
+
+
+# ---------------------------------------------------------------------------
+# phrase: ledger data -> a plain answer, without changing a single fact
+# ---------------------------------------------------------------------------
+
+PHRASE_SYSTEM = """You rewrite a short status message from a carbon-accounting ledger so it reads naturally in a
+team chat. Use only the facts in the message. Keep every number, unit, id (like GAP-012, INV-204B, ACT-0739d5932d,
+CLOSE-2026-10-v1), month, and @handle exactly as written, and keep all of them. Do not add numbers, facts,
+advice, totals or estimates; do not calculate anything; do not change any status word (VERIFIED, UNVERIFIED,
+MISSING, ...). At most three sentences. Reply with the rewritten message only."""
+
+_NUMBER = re.compile(r"(?<![A-Za-z0-9-])\d[\d,]*(?:\.\d+)?")
+_ID = re.compile(r"\b[A-Z][A-Z0-9]*(?:-[A-Za-z0-9]+)+\b")
+_HANDLE = re.compile(r"@[\w-]+(?:\.[\w-]+)*")
+_MONTH = re.compile(r"\b\d{4}-\d{2}(?:-\d{2})?\b")
+_STATUS = re.compile(r"\b(?:VERIFIED|UNVERIFIED|FLAGGED|EXCLUDED|SUPERSEDED|MISSING|CONFLICTING|STALE|OPEN|RESOLVED|"
+                     r"ACCEPTED_RISK|PUBLISHED|DRAFTED)\b")
+
+
+def facts_in(text: str) -> dict[str, set[str]]:
+    """The tokens phrase() must keep: numbers (commas ignored), ids, months/dates, @handles, status words."""
+    ids = set(_ID.findall(text))
+    rest = _ID.sub(" ", text)
+    months = set(_MONTH.findall(rest))
+    rest = _MONTH.sub(" ", rest)
+    numbers = {n.replace(",", "") for n in _NUMBER.findall(rest)}
+    return {"numbers": numbers, "ids": ids, "months": months, "handles": set(_HANDLE.findall(text)),
+            "statuses": set(_STATUS.findall(text))}
+
+
+@dataclass(frozen=True)
+class Phrased:
+    text: str
+    phrased: bool  # True = the model's wording was used
+    reason: str | None = None  # why the plain text was kept
+    model: str | None = None
+
+
+def phrase(message: str, *, question: str | None = None, mode: str | None = None, client: Any = None) -> Phrased:
+    """Reword `message` (built by code from ledger data) for people, optionally answering `question`.
+
+    CR_PHRASE=off (default) returns the message as is. With auto, the model's wording is used only if it keeps
+    exactly the same numbers, ids, @handles and status words; otherwise, or on any model error or spent budget,
+    the original message is returned. Model: LLM_MODEL_PHRASE (else LLM_MODEL)."""
+    mode = (mode or config.env("CR_PHRASE", "off") or "off").lower()
+    if mode == "off":
+        return Phrased(message, False, "phrasing is off (CR_PHRASE)")
+    if not is_configured(task="phrase"):
+        return Phrased(message, False, "no model configured for phrasing")
+    user = (f"Question: {question}\n\n" if question else "") + f"Message:\n{message}"
+    try:
+        text, p = chat([{"role": "system", "content": PHRASE_SYSTEM}, {"role": "user", "content": user}],
+                       task="phrase", max_tokens=400, client=client)
+    except LLMError as exc:
+        return Phrased(message, False, f"model unavailable: {exc}")
+    text = _THINK.sub("", text).strip().strip('"').strip()
+    if not text:
+        return Phrased(message, False, "model returned nothing", p.model)
+    if len(text) > 2 * len(message) + 200:
+        return Phrased(message, False, "model reply too long", p.model)
+    want, got = facts_in(message), facts_in(text)
+    changed = [f"{kind}: {sorted(want[kind] ^ got[kind])}" for kind in want if want[kind] != got[kind]]
+    if changed:
+        return Phrased(message, False, "model changed facts (" + "; ".join(changed) + ")", p.model)
+    return Phrased(text, True, None, p.model)
 
 
 def list_models() -> list[str]:

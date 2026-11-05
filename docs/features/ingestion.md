@@ -70,7 +70,8 @@ sequenceDiagram
 - Page text: pdfplumber for PDFs; `.txt`/`.md` split on form feeds. A scan, photo or corrupt PDF has no text,
   which becomes a gap, never a guess.
 - Proposers (`--proposer` / `CR_PROPOSER`): `auto` = cache → model (if configured) → rules; `llm` = cache → model
-  (error if none); `rules` = cache → rules. `--refresh-cache` skips the cache. Every proposal is saved to the cache
+  (error if none); `rules` = cache → rules; `replay` = cache only (an uncached document gets nothing extracted,
+  and a gap says so). `--refresh-cache` skips the cache. Every proposal is saved to the cache
   with a label: `rules-v1`, `llm:<provider>:<model>`, and `cache:` is prefixed when it is reused. Proposal format:
   `cr.extraction.v1` (see `docs/EXPLAIN_ingestion.md`).
 - Verification. A value is accepted only if:

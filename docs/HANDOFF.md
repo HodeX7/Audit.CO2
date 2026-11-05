@@ -203,6 +203,13 @@ text, used = llm.chat([{"role": "user", "content": "Summarize GAP-012 for Lena"}
 data, used = llm.chat_json(messages, task="check")   # JSON reply, fences/<think> stripped
 ```
 
+To answer a person in plain words from ledger data (the architecture's "phrase"), build the message in code and
+call `llm.phrase(message, question=...)`: it returns `.text` (the model's wording only if every number, id, month,
+@handle and status word is unchanged; otherwise your message) and `.phrased`. Off unless `CR_PHRASE=auto`.
+To cap spend, wrap your agent's work in `budgets.scope(conn, close_id, "cr-watchdog")` (`from carbonroom import
+budgets`): every model call inside is charged to you for that close; at the cap calls raise
+`llm.BudgetExceeded` (an `LLMError`), so keep a non-model fallback.
+
 The model comes from settings, not code: `LLM_PROVIDER` + `LLM_MODEL`, or per task `LLM_MODEL_REPORT`,
 `LLM_PROVIDER_CHECK`, ... Presets: nvidia, anthropic, openai, openrouter, ollama (local, no key), openai_compatible
 (any server via `LLM_BASE_URL`). Other SDKs: `llm.register_provider(name, client_factory=...)`. Details:

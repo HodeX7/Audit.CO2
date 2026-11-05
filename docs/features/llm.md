@@ -74,10 +74,51 @@ flowchart LR
 Current choice: `nvidia/nemotron-3-ultra-550b-a55b` (13/13 exact, 0 rejected). Backup:
 `nvidia/nemotron-3.5-bolt-e4b` (13/13). To try another vendor: `carbonroom llm bench --provider openrouter --models ...`.
 
+### Extract and phrase only
+
+The architecture's "Model adapter: extract, phrase only". The model never does arithmetic or decides a status.
+
+- **extract** (task `extract`): proposes fields from a document; code keeps them only if the excerpt is on the page.
+- **phrase** (task `phrase`, `carbonroom.llm.phrase`): rewords a message that code built from ledger data, for
+  people, optionally answering their question. The reworded text is used only if it keeps exactly the same numbers
+  (commas ignored), ids (`GAP-012`, `INV-204B`, `CLOSE-2026-10-v1`), months, `@handles` and status words
+  (`carbonroom.llm.facts_in`); otherwise, or on any model error, the plain message is used and `reason` says why.
+  Off by default (`CR_PHRASE=off`): the plain messages are already readable and the demo stays repeatable. Turn it
+  on with `CR_PHRASE=auto`; give it a fast model with `LLM_MODEL_PHRASE`.
+
+```mermaid
+flowchart LR
+  D[ledger data] --> T[code builds the message]
+  T --> P{CR_PHRASE=auto and a model?}
+  P -->|no| O[plain message]
+  P -->|yes| M[model rewords it]
+  M --> G{same numbers, ids, months, @handles, statuses?}
+  G -->|yes| W[reworded message]
+  G -->|no| O
+```
+
+### Budgets: a token cap per agent per close
+
+`carbonroom.budgets.scope(conn, close_id, agent)` charges every model call inside it (including the batch run's
+worker threads, which inherit the scope) to that agent for that close. Each call appends an `llm_usage` event
+(task, model, tokens) to the ledger's audit chain, so the tally survives restarts and is shared by every process.
+At `CR_BUDGET_WARN` (0.8) of `CR_BUDGET_TOKENS` (200,000) it appends `budget_warning`; at the cap it appends
+`budget_exhausted` and further calls raise `carbonroom.llm.BudgetExceeded`, which callers treat like "no model":
+extraction falls back to the cache and rules, phrasing to the plain message. Nothing loops or runs up a bill.
+Tokens come from the provider's `usage`; if it reports none, about 4 characters per token.
+`carbonroom llm budget --close CLOSE-2026-10-v1` shows the spend.
+
+### Replay mode
+
+`CR_PROPOSER=replay` (or `--proposer replay`) reads only the committed extraction cache: no model, no rules. A
+document that isn't in the cache gets nothing extracted (a gap says so) rather than a guess. With the cache in the
+repo, judges reproduce the seed exactly without an API key.
+
 ## Decisions
 
 See `docs/DECISIONS.md`: model-agnostic presets + per-task settings + adapters; no default model; probe and bench
-results; timeouts/attempts; cloud-site prompt fix; `CR_ANTHROPIC_BASE_URL` instead of `ANTHROPIC_BASE_URL`.
+results; timeouts/attempts; cloud-site prompt fix; `CR_ANTHROPIC_BASE_URL` instead of `ANTHROPIC_BASE_URL`;
+phrase guarded by "same facts" (off by default); budgets kept in the audit chain; replay mode.
 
 ## Code map
 
@@ -93,6 +134,12 @@ results; timeouts/attempts; cloud-site prompt fix; `CR_ANTHROPIC_BASE_URL` inste
 | `carbonroom.llm.list_models` | GET /models |
 | `carbonroom.llm.looks_like_chat_model` | hide embedding/safety/OCR models from lists |
 | `carbonroom.ingest.extract.llm_propose` | the extraction prompt (`cr.extraction.v1`) |
+| `carbonroom.llm.phrase` | reword a ledger message; refused if any fact changes |
+| `carbonroom.llm.facts_in` | the numbers, ids, months, @handles and statuses a rewording must keep |
+| `carbonroom.llm.Budget` | the cap, the warning line, refusing calls at the cap |
+| `carbonroom.llm.budget_scope` | charge calls in this block (and threads that inherit it) to a budget |
+| `carbonroom.budgets.scope` | a budget for one agent on one close, tallied in the ledger |
+| `carbonroom.budgets.report` | spend per agent for a close |
 
 ## Tests
 
@@ -102,7 +149,12 @@ configured; retired/missing models are not retried; Retry-After honoured; Anthro
 bench (early stop on unavailable or repeatedly timing-out models). `tests/test_llm_providers.py`: every preset's URL,
 key and temperature; local Ollama needs no key; any OpenAI-compatible server; generic and per-task overrides; a
 homegrown non-OpenAI SDK plugged in with `register_provider` drives a real extraction; a failing plug-in falls back to
-rules; `llm providers` and `--provider`.
+rules; `llm providers` and `--provider`. `tests/test_model_adapter.py`: phrasing is off unless asked; a faithful
+rewording is used; one that changes a number, drops an id, changes a status, invents a total, shifts the month or
+names another owner is refused; a failing or missing model keeps the plain message; phrase has its own model
+setting; a budget warns once then stops calls; the tally lives in the ledger and survives a restart; a spent budget
+makes extraction fall back to rules; the batch run's worker threads charge the same budget; replay reproduces the
+seed from the cache and never guesses an uncached document.
 
 ## Commands
 
@@ -112,6 +164,7 @@ rules; `llm providers` and `--provider`.
 | `carbonroom llm models` | `--provider NAME`, `--grep REGEX`, `--all` (include embedding/safety/OCR models) |
 | `carbonroom llm probe` | `--provider NAME`, `--models a,b` (default: listed chat models), `--grep REGEX`, `--all`, `--limit` (default 25) |
 | `carbonroom llm bench` | `--provider NAME`, `--models a,b`, `--verbose` / `-v` |
+| `carbonroom llm budget` | `--close CLOSE-...` (required), `--json` |
 
 `--provider` switches the provider for that one run (same as setting `LLM_PROVIDER`).
 
