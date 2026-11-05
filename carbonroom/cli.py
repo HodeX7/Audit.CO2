@@ -1,6 +1,7 @@
 """`carbonroom` command line.
 
-Base commands (Ujjwal): init, seed, ingest, extract, ledger, llm.
+Base commands (Ujjwal): init, seed, ingest, extract, ledger, llm, graphdb, close (the core API without Switch),
+collector (the @collector agent: JSON event in, JSON ops out).
 Teammates add their own commands WITHOUT editing this file: create a module with a
 `register(subparsers)` function at one of PLUGIN_MODULES (e.g. carbonroom/calc/cli.py) and it is
 picked up automatically. See docs/HANDOFF.md.
@@ -419,6 +420,108 @@ def cmd_ledger_closes(args) -> int:
               f"started by @{c['started_by']}{published}")
     if not closes:
         print("no closes yet")
+    return 0
+
+
+def cmd_close_start(args) -> int:
+    from carbonroom import core
+
+    conn = _connect(args)
+    sites = [s.strip() for s in args.sites.split(",") if s.strip()] if args.sites else None
+    close_id = core.start_close(args.month, sites, args.factor_set, args.actor, args.message_id, conn=conn)
+    from carbonroom.ledger import db
+
+    close = db.get_close(conn, close_id)
+    conn.close()
+    if args.json:
+        _print_json(close)
+    else:
+        print(f"{close_id} {close['phase']}: locked sites {', '.join(close['sites'])}; factor set {close['factor_set']}")
+    return 0
+
+
+def cmd_close_ingest(args) -> int:
+    from carbonroom import core
+
+    conn = _connect(args)
+    report = core.ingest(args.close_id, workers=args.workers, conn=conn)
+    conn.close()
+    _print_json(report) if args.json else print(report["summary_text"])
+    return 0
+
+
+def cmd_close_show(args) -> int:
+    from carbonroom import core
+
+    conn = _connect(args)
+    state = core.status(args.close_id, conn=conn)
+    conn.close()
+    if args.json:
+        _print_json(state)
+        return 0
+    c = state["close"]
+    print(f"{c['id']} {c['phase']} (v{c['version']}): sites {', '.join(c['sites'])}; factor set {c['factor_set']}")
+    print("claims: " + (", ".join(f"{n} {s}" for s, n in sorted(state["claims_by_status"].items())) or "none"))
+    print("open gaps: " + (", ".join(state["open_gaps"]) or "none"))
+    print("expected but missing: " + ("; ".join(f"{m['site_name']} {m['category']} (@{m['owner_handle']})"
+                                                for m in state["expected_missing"]) or "none"))
+    print("P2 functions plugged in: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in state["implemented"].items()))
+    return 0
+
+
+def cmd_close_verify_audit(args) -> int:
+    from carbonroom import core
+
+    conn = _connect(args)
+    check = core.verify_audit(args.close_id, conn=conn)
+    conn.close()
+    _print_json(check) if args.json else print(check["summary_text"])
+    return 0 if check["ok"] else 1
+
+
+def _read_event(raw: str) -> dict:
+    return json.loads(sys.stdin.read() if raw == "-" else raw)
+
+
+def cmd_collector_handle(args) -> int:
+    from carbonroom.agents import collector
+
+    conn = _connect(args)
+    ops = collector.handle(_read_event(args.event), conn=conn)
+    conn.close()
+    _print_json(ops)
+    return 0
+
+
+def cmd_collector_check_report(args) -> int:
+    from carbonroom.agents import collector
+
+    conn = _connect(args)
+    report = json.loads(Path(args.file).read_text()) if args.file else collector.latest_report(conn, args.close)
+    if report is None:
+        conn.close()
+        print(f"no collection report for {args.close}")
+        return 1
+    result = collector.check_report(conn, report)
+    conn.close()
+    if args.json:
+        _print_json(result)
+    else:
+        print(("OK   " if result["ok"] else "FAIL ") + f"{result.get('close_id')}: {result['checked']}")
+        for problem in result["problems"]:
+            print(f"FAIL {problem}")
+    return 0 if result["ok"] else 1
+
+
+def cmd_collector_explain(args) -> int:
+    from carbonroom.agents import collector
+    from carbonroom.ledger import db
+
+    conn = _connect(args)
+    close = db.get_close(conn, args.close) if args.close else collector.find_close(conn, {"text": args.text})
+    answer = collector.explain(conn, args.text, close=close)
+    conn.close()
+    _print_json(answer) if args.json else print(answer["summary_text"])
     return 0
 
 
@@ -936,6 +1039,46 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--close", required=True, help="close id, e.g. CLOSE-2026-10-v1")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_llm_budget)
+
+    close_p = sub.add_parser("close", help="the core API without Switch: start a close, ingest, show, verify audit"
+                             ).add_subparsers(dest="close_cmd", required=True)
+    p = close_p.add_parser("start", help="open a month's close; lock its sites and factor set")
+    p.add_argument("--month", required=True, help="YYYY-MM")
+    p.add_argument("--sites", help="comma-separated site ids (default: every site)")
+    p.add_argument("--factor-set", help="factor set version to lock (default: the month's, else CR_FACTOR_SET)")
+    p.add_argument("--actor", required=True, help="who asked (a person's handle)")
+    p.add_argument("--message-id", help="the Switch chat_message_id, when started from the room")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_close_start)
+    p = close_p.add_parser("ingest", help="@collector: ingest every source for a close and report (all UNVERIFIED)")
+    p.add_argument("close_id")
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_close_ingest)
+    p = close_p.add_parser("show", help="a close's phase, claims, open gaps, missing evidence")
+    p.add_argument("close_id")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_close_show)
+    p = close_p.add_parser("verify-audit", help="walk the audit chain; exits 1 if it is broken")
+    p.add_argument("close_id")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_close_verify_audit)
+
+    col = sub.add_parser("collector", help="the @collector agent (room event JSON in, ops JSON out)").add_subparsers(
+        dest="collector_cmd", required=True)
+    p = col.add_parser("handle", help="handle one room event; prints the ops for the router")
+    p.add_argument("event", help="event JSON, or - to read it from stdin")
+    p.set_defaults(func=cmd_collector_handle)
+    p = col.add_parser("check-report", help="re-derive a collection report from the ledger and files")
+    p.add_argument("--close", help="check this close's latest report")
+    p.add_argument("--file", help="or a report saved as JSON")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_collector_check_report)
+    p = col.add_parser("explain", help="'why didn't you consider X?' - what happened to a named document")
+    p.add_argument("text")
+    p.add_argument("--close", help="close id (default: the open close the text names, else the latest)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_collector_explain)
 
     gdb = sub.add_parser("graphdb", help="the knowledge graph in Neo4j (graph database)").add_subparsers(
         dest="graphdb_cmd", required=True)

@@ -6,6 +6,11 @@ Each owner keeps their own section up to date. Shared contracts: `contracts/`.
 
 ## From Ujjwal (Ingestion & Ledger) → Richa and Akshar
 
+Room/orchestrator API: use `core.latest_close`, `core.resume_state`, `core.gap_for_thread`,
+`core.record_gap_thread`, and `core.budget_usage` rather than reading SQLite directly. For an attachment use
+`core.ingest_file(close_id, path, actor, chat_message_id, site=None)`; it returns UNVERIFIED claim ids and the
+message id is retained in the audit chain.
+
 **State:** schema, `db.py`, seed data with traps, collector, extraction with proof, consolidator, CLI and
 tests are done on `feat/ingest` (PR #1). Design docs per feature: `docs/features/`. Run:
 
@@ -61,6 +66,17 @@ is re-verified against its PDF on every run.
 Status rules (`ALLOWED_TRANSITIONS`): `UNVERIFIED → VERIFIED | FLAGGED | EXCLUDED`, `VERIFIED → FLAGGED | EXCLUDED`
 (the false-done reopen), `FLAGGED → VERIFIED | UNVERIFIED | EXCLUDED`, `EXCLUDED → UNVERIFIED`. `SUPERSEDED` only
 through `supersede_activity`, and it is final. `FLAGGED` and `EXCLUDED` need a reason.
+
+### Core API and @collector (architecture "core API seam")
+
+- **Akshar:** call `carbonroom.core` from the room: `start_close`, `ingest`, `verify_audit`, `status` work now;
+  `calculate` ... `trace` raise `NotImplementedError` until Richa plugs them in. `@collector` is
+  `carbonroom.agents.collector.handle(event) -> ops` (or `carbonroom collector handle -`): event and op shapes in
+  `docs/features/core-and-collector.md`. Run it in your worker pool, not on the socket loop.
+- **Richa:** register your functions without editing core.py: in a core.py inside your calc, check or report
+  package (the names in `CORE_PLUGIN_MODULES`) write `@core.implements("calculate") def calculate(close_id, conn): ...`. Core keeps the
+  phase. To check the collector's "all collected" statement, call
+  `carbonroom.agents.collector.check_report(conn, collector.latest_report(conn, close_id))`.
 
 ### Closes and the room gate (architecture: "Close" contract, "Switch is load-bearing")
 

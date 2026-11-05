@@ -4,6 +4,9 @@ Each owner updates their own section: done / next / blocked.
 
 ## Ujjwal (Ingestion & Ledger), updated 2026-11-04 15:50 CT
 
+**Current P1 integration**
+- Room-resume helpers and single-file room ingestion are implemented in `core.py`, including an audit-linked human `chat_message_id`.
+
 **Done**
 - `contracts/schema.sql` (Section 5.3, plus the additive columns in `contracts/CHANGES.md`) and `carbonroom/ledger/db.py`
 - Fictional seed data with every document trap (`data/seed/README.md`); 2 documents held back in `data/seed/later/`
@@ -21,6 +24,7 @@ Each owner updates their own section: done / next / blocked.
 - Audit chain: events hash-chained with the Switch `chat_message_id` inside each hash; `ledger verify` checks it (`tests/test_audit_chain.py`)
 - Closes ("locks"): boundary + factor set locked per close, phase in the ledger, versions; approvals, gap closes and publish need the room's `chat_message_id` (`tests/test_publish_needs_room.py`)
 - Model adapter: extract + phrase only (phrase can't change a fact), token budget per agent per close (warn 80%, stop 100%), replay mode
+- `carbonroom/core.py` (core API seam; P2 slots via `@core.implements`) and the `@collector` agent (room event in, ops out; checkable "all collected" report; "why didn't you consider X?"; never marks VERIFIED)
 - LLM: `nvidia/nemotron-3-ultra-550b-a55b`, bench 13/13 exact (backup `nvidia/nemotron-3.5-bolt-e4b`, also 13/13); seed extractions re-saved with it
 
 **Next**
