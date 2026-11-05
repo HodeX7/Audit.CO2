@@ -18,10 +18,10 @@ def _now() -> datetime:
     return datetime.now(UTC).replace(microsecond=0)
 
 
-def _row(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_key: str):
+def _row(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str):
     return conn.execute(
         "SELECT holder, acquired_at FROM locks WHERE close_id=? AND site=? AND month=? AND source_doc_id=?",
-        (close_id, site, month, source_key),
+        (close_id, site, month, source_doc_id),
     ).fetchone()
 
 
@@ -35,8 +35,8 @@ def _is_fresh(row: sqlite3.Row, now: datetime) -> bool:
 
 
 def _active_holder(conn: sqlite3.Connection, close_id: str, site: str, month: str,
-                   source_key: str, now: datetime) -> str | None:
-    row = _row(conn, close_id, site, month, source_key)
+                   source_doc_id: str, now: datetime) -> str | None:
+    row = _row(conn, close_id, site, month, source_doc_id)
     return str(row["holder"]) if row is not None and _is_fresh(row, now) else None
 
 
@@ -61,16 +61,16 @@ def _is_busy(error: sqlite3.OperationalError) -> bool:
 
 
 def _contention(conn: sqlite3.Connection, close_id: str, site: str, month: str,
-                source_key: str) -> LockHeld:
+                source_doc_id: str) -> LockHeld:
     """Return a retryable lock error, naming the committed holder when visible."""
     try:
-        holder = _active_holder(conn, close_id, site, month, source_key, _now())
+        holder = _active_holder(conn, close_id, site, month, source_doc_id, _now())
     except sqlite3.OperationalError:
         holder = None
     return LockHeld(holder or "another worker")
 
 
-def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_key: str,
+def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str,
              holder: str) -> None:
     """Commit the work and removal of the published lease together."""
     if not conn.in_transaction:
@@ -78,7 +78,7 @@ def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, sou
     try:
         conn.execute(
             "DELETE FROM locks WHERE close_id=? AND site=? AND month=? AND source_doc_id=? AND holder=?",
-            (close_id, site, month, source_key, holder),
+            (close_id, site, month, source_doc_id, holder),
         )
         conn.commit()
     except Exception:
@@ -88,7 +88,7 @@ def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, sou
 
 
 @contextmanager
-def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_key: str,
+def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str,
                holder: str) -> Iterator[None]:
     """Publish a five-minute lease for one content key and release it on exit.
 
@@ -102,13 +102,13 @@ def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, s
         # Read before requesting SQLite's single writer slot.  In WAL mode this
         # remains available while the lease holder is writing its source rows.
         now = _now()
-        if (current := _active_holder(conn, close_id, site, month, source_key, now)) is not None:
+        if (current := _active_holder(conn, close_id, site, month, source_doc_id, now)) is not None:
             raise LockHeld(current)
 
         _begin_immediate(conn)
         # Re-read after BEGIN IMMEDIATE to close the preflight/acquisition race.
         now = _now()
-        row = _row(conn, close_id, site, month, source_key)
+        row = _row(conn, close_id, site, month, source_doc_id)
         if row is not None and _is_fresh(row, now):
             raise LockHeld(str(row["holder"]))
         expires_at = (now - _LEASE_TTL).isoformat().replace("+00:00", "Z")
@@ -118,12 +118,12 @@ def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, s
                  holder=excluded.holder, acquired_at=excluded.acquired_at
                WHERE locks.acquired_at <= ?""",
             (
-                close_id, site, month, source_key, holder,
+                close_id, site, month, source_doc_id, holder,
                 now.isoformat().replace("+00:00", "Z"), expires_at,
             ),
         )
         if cursor.rowcount == 0:
-            raise _contention(conn, close_id, site, month, source_key)
+            raise _contention(conn, close_id, site, month, source_doc_id)
         if row is not None:
             append_event(conn, close_id, holder, "stale_lock_taken", payload={"previous_holder": row["holder"]})
         # Publish the reservation before source writes or model extraction.
@@ -132,7 +132,7 @@ def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, s
         if conn.in_transaction:
             conn.rollback()
         if _is_busy(error):
-            raise _contention(conn, close_id, site, month, source_key) from error
+            raise _contention(conn, close_id, site, month, source_doc_id) from error
         raise
     except Exception:
         if conn.in_transaction:
@@ -143,7 +143,7 @@ def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, s
     except Exception:
         if conn.in_transaction:
             conn.rollback()
-        _release(conn, close_id, site, month, source_key, holder)
+        _release(conn, close_id, site, month, source_doc_id, holder)
         raise
     else:
-        _release(conn, close_id, site, month, source_key, holder)
+        _release(conn, close_id, site, month, source_doc_id, holder)

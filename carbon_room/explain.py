@@ -18,5 +18,9 @@ def answer(conn, close_id: str, question: str, actor) -> str:
         gaps = ledger.get_gaps(conn, close_id, status="OPEN")
         owner = next((gap.owner for gap in gaps if not site_id or any(claim.site == site_id for claim in claims)), owner)
         return llm.phrase(question, [], "carbon-room", close_id, scope=site_id or "this close", owner=owner)
-    facts = [f"{claim.claim_id}: {claim.site} {claim.value} {claim.unit}, status {claim.status}" for claim in verified]
+    facts = []
+    for claim in verified:
+        calculation = ledger.latest_calculation(conn, claim.claim_id)
+        emissions = f", {calculation.kgco2e} kgCO2e" if calculation else ", no calculation recorded"
+        facts.append(f"{claim.claim_id}: {claim.site} {claim.value} {claim.unit}{emissions}, status {claim.status}")
     return llm.phrase(question, facts, "carbon-room", close_id)

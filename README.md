@@ -53,9 +53,11 @@ Live extraction defaults to Anthropic, but deployments can register a vendor-neu
 
 ## Demonstrating P1
 
+After P2 supplies `config/carbon_room.yaml`, replace the factor-set value below with one of its configured keys.
+
 ```bash
 uv run carbon-room init
-uv run carbon-room close 2026-10 --site hq --site warehouse-2 --site dc-eu-west --factor-set demo
+uv run carbon-room close 2026-10 --site hq --site warehouse-2 --site dc-eu-west --factor-set FS-2026-10
 uv run carbon-room ingest 2026-10-v1
 uv run carbon-room verify-audit 2026-10-v1
 ```
@@ -69,5 +71,7 @@ remain unavailable until their owners implement them. Do not present them as a w
 - `CARBON_ROOM_CONFIG_DIR` can point to an alternate configuration directory for tests or deployments.
 - `var/`, `data/store/`, extraction caches, databases, and uploads are ignored by Git.
 - `scripts/make_seed.py` regenerates only synthetic demo evidence.
+- `tests/fixtures/emissions_reference/` is a separate, offline, source-cited synthetic test corpus; it is not a
+  production factor catalog.
 
 See `docs/HANDOFF.md` for the P1 contract and integration checklist.

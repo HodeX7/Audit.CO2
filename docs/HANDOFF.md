@@ -23,8 +23,12 @@ Use `carbon_room.core` rather than reaching into P1 implementation modules:
 - P3 uses `gap_for_thread`, `record_gap_thread`, and `resume_state` to restore room state.
 - P2 uses `ledger` operations and contract dataclasses from `carbon_room.models`.
 - P2/P3 must preserve `chat_message_id` when recording human actions.
+- Before P3 starts a close, P2 must provide `config/carbon_room.yaml` with the allowed `factor_sets`; P1 rejects an
+  unknown or unavailable factor set and records the selected one as `factor_set_locked`.
 - Live model extraction can use the default Anthropic client or a vendor-neutral provider registered with
   `carbon_room.llm.set_completion_provider`; P1 validates extracted evidence deterministically either way.
+- `tests/fixtures/emissions_reference/` is an offline P1 regression corpus. Its source metadata is test-only;
+  P2 must not import it as production factors or use its national-grid references to calculate cloud allocations.
 
 `claim_lock` is an internal P1 primitive. It must be entered on a connection without an active transaction so its
 published lease is visible to competing SQLite workers; P2/P3 should use the public facade instead.

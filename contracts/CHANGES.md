@@ -9,6 +9,10 @@ The active contract implementation lives in `carbon_room/`.
 - `claim_lock` now publishes its lease in its own SQLite transaction and rejects connections with uncommitted work.
   This prevents an invisible lease during concurrent ingestion; P3 should call the public `core` functions rather
   than the internal lock directly.
+- `start_close` now rejects an unknown or unavailable factor set and records the accepted set as
+  `factor_set_locked`. P2 supplies the contract-owned factor-set catalog in `config/carbon_room.yaml`.
+- A source with no proof-backed extraction candidate is retained as `FAILED`, with its deterministic rejection
+  reason, rather than being reported as successfully extracted.
 - A gap thread root message identifier is unique across the ledger.
 - Gap primary identity is `(close_id, gap_id)`, so `G-1` correctly restarts for each close as specified in P1-2.5.
   **Integration note for P2/P3:** `core.resolve(gap_id, ...)` has no `close_id`, so their router must resolve the

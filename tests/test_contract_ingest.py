@@ -66,3 +66,30 @@ def test_upload_rolls_back_source_claims_and_lease_when_room_event_fails(db, mon
     assert db.execute("SELECT COUNT(*) FROM sources WHERE close_id=?", (close_id,)).fetchone()[0] == 0
     assert db.execute("SELECT COUNT(*) FROM claims WHERE close_id=?", (close_id,)).fetchone()[0] == 0
     assert db.execute("SELECT COUNT(*) FROM locks WHERE close_id=?", (close_id,)).fetchone()[0] == 0
+
+
+def test_rejected_extraction_marks_the_source_failed_with_its_reason(db, monkeypatch):
+    close_id = ledger.create_close(db, "2026-10", ["warehouse-2"], "FS-test", SYSTEM, "msg")
+    db.commit()
+    monkeypatch.setattr(
+        collect,
+        "_candidates",
+        lambda *_args: [{"activity": "electricity_kwh", "value": "10", "unit": "kWh", "excerpt": "invented", "page": 0}],
+    )
+    claim_ids = collect.ingest_file(
+        db, close_id, "data/demo_uploads/warehouse2_electricity_2026-10_actual.pdf", SYSTEM,
+        site="warehouse-2", month_from_period=True,
+    )
+    source = ledger.get_sources(db, close_id)[0]
+    assert claim_ids == []
+    assert source.extract_status == "FAILED"
+    assert source.extract_error == "excerpt is not verbatim source text"
+
+
+def test_ingestion_can_identify_a_site_from_the_document_text(db, tmp_path):
+    close_id = ledger.create_close(db, "2026-10", ["warehouse-2"], "FS-test", SYSTEM, "msg")
+    db.commit()
+    source_path = tmp_path / "invoice.txt"
+    source_path.write_text("Warehouse-2 utility invoice\nUsage: 10 kWh", encoding="utf-8")
+    claim_ids = collect.ingest_file(db, close_id, source_path, SYSTEM)
+    assert ledger.get_claim(db, claim_ids[0]).site == "warehouse-2"

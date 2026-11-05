@@ -22,11 +22,11 @@ from carbon_room.sources.store import store_file
 from carbon_room.sources.validate import validate
 
 
-def _site_for(path: Path, explicit_site: str | None) -> str:
+def _site_for(path: Path, explicit_site: str | None, pages: list[str]) -> str:
     if explicit_site:
         config.site(explicit_site)
         return explicit_site
-    haystack = re.sub(r"[^a-z0-9]", "", path.name.lower())
+    haystack = re.sub(r"[^a-z0-9]", "", f"{path.name}\n{' '.join(pages)}".lower())
     for entry in config.load_sites()["sites"]:
         identifiers = (entry["id"], entry["name"])
         if any(re.sub(r"[^a-z0-9]", "", value.lower()) in haystack for value in identifiers):
@@ -67,6 +67,20 @@ def _candidates(pages: list[str], kind: str, file_name: str, digest: str, close_
     return [candidate] if candidate else []
 
 
+def _validated_candidates(kind: str, pages: list[str], candidates: list[dict]) -> tuple[list[dict], str | None]:
+    """Return proof-backed candidates and a stable failure reason when none survive."""
+    if kind == "cloud_invoice":
+        return candidates, None if candidates else "cloud invoice has no activity record"
+    valid, reasons = [], []
+    for candidate in candidates:
+        accepted, reason = validate(candidate, pages)
+        if accepted:
+            valid.append(candidate)
+        else:
+            reasons.append(reason)
+    return valid, (reasons[0] if reasons else "no extractable activity found")
+
+
 def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None,
                 month_from_period: bool = False, chat_message_id: str | None = None) -> list[str]:
     """Store, read and record one source; source text, not a model, is the proof boundary."""
@@ -74,11 +88,11 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
         raise NeedsRoomEvent("human uploads require a Switch chat_message_id")
     close = ledger.get_close(conn, close_id)
     source_path = Path(path)
-    resolved_site = _site_for(source_path, site)
-    if resolved_site not in close["sites"]:
-        raise ValueError(f"{resolved_site} is outside the close boundary")
     kind, result = read(source_path)
     pages = result if isinstance(result, list) else []
+    resolved_site = _site_for(source_path, site, pages)
+    if resolved_site not in close["sites"]:
+        raise ValueError(f"{resolved_site} is outside the close boundary")
     stored_path, digest = store_file(source_path)
     with claim_lock(conn, close_id, resolved_site, close["month"], digest, actor.id):
         if ledger.source_for_sha(conn, close_id, digest) is not None:
@@ -90,13 +104,14 @@ def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor
             return []
         source_id = next_id(conn, "SRC")
         period = parse_period("\n".join(pages)) if pages else None
-        source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
-                        period[0] if period else None, period[1] if period else None, "OK" if pages else "FAILED", result if isinstance(result, str) else None)
-        ledger.add_source(conn, source, actor, chat_message_id)
         candidates = [cloud.extract(source_path)] if kind == "cloud_invoice" and pages else _candidates(
             pages, kind, source_path.name, digest, close_id, conn
         )
-        valid = [candidate for candidate in candidates if kind == "cloud_invoice" or validate(candidate, pages)[0]]
+        valid, extraction_error = _validated_candidates(kind, pages, candidates) if pages else ([], result)
+        source = Source(source_id, close_id, resolved_site, kind, source_path.name, stored_path, digest, len(pages), "\n\f".join(pages),
+                        period[0] if period else None, period[1] if period else None,
+                        "OK" if valid else "FAILED", None if valid else str(extraction_error))
+        ledger.add_source(conn, source, actor, chat_message_id)
         claim_month = period[0][:7] if month_from_period and period else close["month"]
         claim_ids = []
         for candidate in valid:

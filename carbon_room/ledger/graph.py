@@ -20,7 +20,7 @@ def chain(conn: sqlite3.Connection, claim_id: str) -> dict:
     result = {"claim": claim, "source": dict(source) if source else None, "factor": dict(factor) if factor else None,
               "calculation": dict(calculation) if calculation else None, "gaps": gaps, "approvals": approvals,
               "complete": False, "missing": None}
-    for name in ("source", "factor", "calculation"):
+    for name in ("source", "calculation", "factor"):
         if result[name] is None:
             result["missing"] = name
             return result

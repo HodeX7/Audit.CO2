@@ -14,5 +14,7 @@ def parse_period(text: str) -> tuple[str, str] | None:
     natural = re.search(r"Billing period:\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s*(?:–|-)\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})", text)
     if natural:
         return tuple(datetime.strptime(value, "%d %b %Y").date().isoformat() for value in natural.groups())
-    json_dates = re.search(r'"period_start"\s*:\s*"(\d{4}-\d{2}-\d{2})".*?"period_end"\s*:\s*"(\d{4}-\d{2}-\d{2})"', text, re.S)
-    return json_dates.groups() if json_dates else None
+    json_dates = dict(re.findall(r'"(period_start|period_end)"\s*:\s*"(\d{4}-\d{2}-\d{2})"', text))
+    if {"period_start", "period_end"} <= json_dates.keys():
+        return json_dates["period_start"], json_dates["period_end"]
+    return None

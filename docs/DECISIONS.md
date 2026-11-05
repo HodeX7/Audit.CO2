@@ -16,3 +16,6 @@
   before source writes, so a competing worker can read it in WAL mode and receive `LockHeld` rather than a database
   lock error. `claim_lock` owns that transaction boundary; callers must enter it with no active transaction.
   2026-11-05
+- Public emissions publications are represented only as pinned provenance beside fictional P1 test evidence, never as
+  a production factor catalog. Why: source edition, geography, boundary, scope, and allocation method must be
+  selected and owned by P2 before any customer-facing calculation can be valid. 2026-11-05

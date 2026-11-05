@@ -84,7 +84,8 @@ def create_close(conn, month, sites, factor_set, actor, chat_message_id) -> str:
         "INSERT INTO closes VALUES (?,?,?,?,?,?,?,?,NULL,NULL,NULL)",
         (close_id, month, _json(list(sites)), factor_set, "OPEN", version, actor_id(actor), chat_message_id),
     )
-    append_event(conn, close_id, actor, "close_created", chat_message_id=chat_message_id, payload={"factor_set": factor_set})
+    append_event(conn, close_id, actor, "factor_set_locked", chat_message_id=chat_message_id,
+                 payload={"factor_set": factor_set})
     return close_id
 
 

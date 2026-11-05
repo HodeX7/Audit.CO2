@@ -20,6 +20,7 @@ def test_store_is_content_addressed(tmp_path):
 def test_period_formats_and_verbatim_evidence_validation():
     assert parse_period("Billing period: 1 Sep 2026 – 30 Sep 2026") == ("2026-09-01", "2026-09-30")
     assert parse_period("Period: 2026-09-01 to 2026-09-30") == ("2026-09-01", "2026-09-30")
+    assert parse_period('{"period_end":"2026-09-30","period_start":"2026-09-01"}') == ("2026-09-01", "2026-09-30")
     assert validate({"page": 0, "excerpt": "Usage: 48,200 kWh", "value": "48200"}, ["Usage: 48,200 kWh"])[0]
     assert not validate({"page": 0, "excerpt": "Usage was 48,200", "value": "48200"}, ["Usage: 48,200 kWh"])[0]
 

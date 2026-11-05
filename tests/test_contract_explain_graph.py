@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from carbon_room import explain
 from carbon_room.ledger import graph, ledger
-from carbon_room.models import Actor, Claim, Source
+from carbon_room.models import Actor, Calculation, Claim, Source
 
 
 def _claim(db):
@@ -25,4 +25,22 @@ def test_graph_chain_names_missing_calculation(db):
     _, _, claim_id = _claim(db)
     result = graph.chain(db, claim_id)
     assert not result["complete"]
-    assert result["missing"] == "factor"
+    assert result["missing"] == "calculation"
+
+
+def test_explain_includes_verified_activity_and_latest_emissions(db):
+    actor, close_id, claim_id = _claim(db)
+    ledger.load_factors(db, [{
+        "factor_id": "F-1", "source": "factor-source", "version": "v1", "year": "2026",
+        "activity": "electricity_kwh", "geography": "test", "value": Decimal("0.2"),
+        "unit": "kgCO2e/kWh", "citation": "test",
+    }])
+    ledger.set_factor(db, claim_id, "F-1", "v1", actor, "factor selected")
+    ledger.add_calculation(db, Calculation(
+        "CA-0001", claim_id, "F-1", "v1", Decimal("1"), "kWh", Decimal("0.2"),
+        "kgCO2e/kWh", Decimal("0.2"), "1 * 0.2", "location",
+    ))
+    ledger.set_status(db, claim_id, "VERIFIED", actor, "all rules passed")
+    answer = explain.answer(db, close_id, "What is hq electricity?", actor)
+    assert "1 kWh" in answer
+    assert "0.2 kgCO2e" in answer

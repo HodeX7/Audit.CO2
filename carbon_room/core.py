@@ -16,6 +16,13 @@ def start_close(month, sites, factor_set, actor, chat_message_id):
     """P1 implementation: create a close and lock its factor set."""
     if len(month) != 7 or month[4] != "-":
         raise ValueError("month must use YYYY-MM")
+    try:
+        factor_sets = config.load_config().get("factor_sets", {})
+    except FileNotFoundError as error:
+        raise ValueError("factor-set configuration is unavailable; add config/carbon_room.yaml") from error
+    if factor_set not in factor_sets:
+        available = ", ".join(sorted(factor_sets)) or "none"
+        raise ValueError(f"unknown factor set {factor_set!r}; configured factor sets: {available}")
     boundary = list(sites)
     for site_id in boundary:
         config.site(site_id)
