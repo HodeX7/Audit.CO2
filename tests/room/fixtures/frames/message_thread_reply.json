@@ -1,0 +1,5 @@
+{"_source": "docs", "event": "message", "id": 102,
+ "data": {"type": "message", "room_id": "room-1", "bridge_id": null, "channel_type": "channel_public", "sequence": 102,
+          "payload": {"addressed": true, "sender": "@switch-user-lead:test", "sender_name": "lead",
+                      "message_id": "msg-reply-1", "body": "pick a", "timestamp": 1793000001000,
+                      "thread_id": "msg-root-1", "attachments": []}}}

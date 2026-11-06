@@ -1,0 +1,5 @@
+{"_source": "docs", "event": "message", "id": 104,
+ "data": {"type": "message", "room_id": "room-1", "bridge_id": null, "channel_type": "channel_public", "sequence": 104,
+          "payload": {"addressed": false, "sender": "@switch-agent-watchdog:test", "sender_name": "watchdog",
+                      "message_id": "msg-own-1", "body": "**G-1 · PERIOD** …", "timestamp": 1793000003000,
+                      "thread_id": null, "attachments": []}}}

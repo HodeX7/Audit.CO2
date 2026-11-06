@@ -1,0 +1,5 @@
+{"_source": "docs", "event": "message", "id": 107,
+ "data": {"type": "message", "room_id": "room-1", "bridge_id": null, "channel_type": "channel_public", "sequence": 107,
+          "payload": {"addressed": true, "sender": "@switch-user-lead:test", "sender_name": "lead",
+                      "body": "@carbon-room close October", "timestamp": 1793000000000,
+                      "thread_id": null, "attachments": []}}}

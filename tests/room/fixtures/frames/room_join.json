@@ -1,0 +1,4 @@
+{"_source": "docs", "event": "room_join", "id": 106,
+ "data": {"type": "room_join", "room_id": "room-1", "bridge_id": null, "channel_type": "channel_public", "sequence": 106,
+          "payload": {"member": "@switch-user-priya:test", "member_name": "priya", "timestamp": 1793000004000,
+                      "listening": true}}}

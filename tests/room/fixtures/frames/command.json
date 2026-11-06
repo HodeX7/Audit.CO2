@@ -1,0 +1,4 @@
+{"_source": "docs", "event": "message", "id": 105,
+ "data": {"type": "command", "room_id": "room-1", "bridge_id": null, "channel_type": "channel_public", "sequence": 105,
+          "payload": {"command": "status", "args": "", "user_id": "@switch-user-lead:test", "user_name": "lead",
+                      "thread_id": null}}}

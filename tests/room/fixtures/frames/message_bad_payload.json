@@ -1,0 +1,2 @@
+{"_source": "docs", "event": "message", "id": 108,
+ "data": {"type": "message", "room_id": "room-1", "sequence": 108, "payload": "not an object"}}
