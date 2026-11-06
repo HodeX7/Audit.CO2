@@ -215,8 +215,8 @@ def test_new_gaps_from_resolve_are_posted(people_config, ctx, fake_core, fake_ro
     fake_core.on_resolve_open = [R7]
     asyncio.run(reply(ctx, LEAD, "approve", thread="m-6", message_id="h-2"))
     g5 = next(g for g in fake_core.resume_state("2026-10-v1")[1] if g.gap_id == "G-5")
-    assert fake_room.top_level()[-1].text == messages.gap_root(g5, R7, "@finance")
-    assert fake_room.top_level()[-1].agent == "watchdog"
+    expected = messages.gap_root(g5, R7, "@finance")
+    assert [p.agent for p in fake_room.top_level() if p.text == expected] == ["watchdog"]
     assert fake_core.gap_for_thread(root(fake_room, "G-5")).gap_id == "G-5"
 
 
