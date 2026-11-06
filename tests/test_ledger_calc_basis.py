@@ -19,8 +19,8 @@ def claim_id(db):
                               "activity": "dc_it_kwh", "geography": "IE", "value": "0.5", "unit": "kgCO2e/kWh",
                               "citation": "test"}])
     close = ledger.create_close(db, "2026-10", ["dc-eu-west"], "FS-test", SYSTEM, "msg")
-    ledger.add_source(db, Source("SRC-1", close, "dc-eu-west", "cloud_invoice", "f.json", "p", "sha", 1, "t", None, None,
-                                 "OK", None), SYSTEM)
+    source = Source("SRC-1", close, "dc-eu-west", "cloud_invoice", "f.json", "p", "sha", 1, "t", None, None, "OK", None)
+    ledger.add_source(db, source, SYSTEM)
     claim = Claim("", close, "dc-eu-west", "2026-10", "dc_it_kwh", D("12000"), "kWh", "DC", "SRC-1", "x", "sha", 0,
                   None, None, "UNVERIFIED", "collector", None, None, {})
     return ledger.add_claim(db, claim, SYSTEM)
