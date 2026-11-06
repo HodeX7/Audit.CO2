@@ -1,0 +1,10 @@
+# P3-owned (contracts §9, proposal 001). Maps Switch senders to people and roles.
+# switch_ids: the sender id the room agent sees for that person (spike S3 records them).
+# username:   the Mattermost username, without @, used to mention the person in gap threads.
+# A sender who isn't listed is a guest: they can ask questions but can't resolve, approve or publish.
+# make doctor fails until lead and priya have switch_ids.
+people:
+  - { id: lead,    name: "Sustainability Lead", role: lead,         username: "", switch_ids: [] }
+  - { id: priya,   name: "Priya",               role: site_manager, username: "", sites: [warehouse-2], switch_ids: [] }
+  - { id: finance, name: "Finance Approver",    role: finance,      username: "", switch_ids: [] }
+  - { id: auditor, name: "External Auditor",    role: auditor,      username: "", switch_ids: [] }
