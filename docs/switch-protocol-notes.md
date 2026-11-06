@@ -21,7 +21,22 @@ edited only by it. Plan §1.5 has the documented facts; spikes are in docs/spike
   frames as `captured_*.json`.
 
 ## S07 connection
-_Not written yet._
+- URL: `ws(s)://<server><prefix>/agents/<agent_id>/connection/ws?connection_id=<uuid>&rooms=<ids, comma>&filter=<all|addressed>&client=carbon-room-python&client_version=<v>`, plus `start_from=<cursor>` and `expected_generation=<g>` once known.
+- Auth: `Authorization: Bearer <agent api key>` on the handshake. The key is never logged.
+- First frame: must be `connection_state`; its `generation` is stored. Anything else is a warning plus a reconnect.
+- Ping: answered inside the read loop with `{"type":"pong","cursor":<cursor or 0>}` before anything else.
+- Cursor: highest domain sequence seen; duplicates (`seq <= cursor`) are skipped.
+  - Deviation 1: the `connection_state` cursor is adopted only when the client has none. `max(cursor, state)` would
+    skip every replayed event if the state cursor is the server head.
+  - Deviation 2: a `gap` frame sets `cursor = resumed_at - 1`. The docs don't say whether `resumed_at` is the next
+    event or the last one skipped; one lower never loses an event, and dispatcher dedupe drops repeats.
+- Close codes: 4401 or HTTP 401/403 raises `AuthError`, no retry. 4400, 4403, 4409 log ERROR and stop.
+  Anything else (1000, 1001, 1011, 1012, no close frame, network errors) reconnects with the same
+  `connection_id`, `start_from` and `expected_generation`.
+- Eviction: `taken_over` and `closed` stop for good; `heartbeat_lapsed` and every other code reconnect.
+- Backoff: 1, 2, 4, 8, 16, then 30 s forever; reset on every `connection_state`. `stop()` interrupts the wait.
+- M2 must confirm: the `gap` `resumed_at` meaning, the control frame envelope (`{"type"}` vs `{"event","data"}`;
+  both parsed), and whether a bad key is HTTP 401 at the handshake or close code 4401 (both handled).
 
 ## S08 ops
 _Not written yet._
