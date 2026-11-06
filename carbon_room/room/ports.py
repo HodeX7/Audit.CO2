@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -33,11 +33,11 @@ class Room(Protocol):
 
 
 async def noop_phase_end(close_id: str) -> None:
-    raise NotImplementedError
+    return None
 
 
 def utc_today() -> date:
-    raise NotImplementedError
+    return datetime.now(timezone.utc).date()
 
 
 @dataclass
