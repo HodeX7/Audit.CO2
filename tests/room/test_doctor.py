@@ -206,8 +206,11 @@ def test_format_checks_failure_layout():
 
 
 def test_doctor_never_prints_keys(base, monkeypatch, capsys):
-    env = {k: "key-secret" for k in base.env}
-    env["CARBON_ROOM_CONFIG_DIR"] = str(base.cfg)
+    env = dict(base.env)
+    for k in base.env:
+        if k.startswith("SWITCH_AGENT_"):
+            env[k] = "key-secret"
+    env["ANTHROPIC_API_KEY"] = "key-secret"
     monkeypatch.setattr(settings, "read_env", lambda *a, **k: env)
     monkeypatch.chdir(base.root)
     doctor.main()
