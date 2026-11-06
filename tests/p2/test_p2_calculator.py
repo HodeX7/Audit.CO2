@@ -135,11 +135,20 @@ def test_running_twice_adds_no_calculations_and_no_events(factor_db, close_id, o
 
 def test_a_factor_a_human_chose_is_respected_and_the_old_calculation_is_superseded(factor_db, close_id, october):
     run.calculate(factor_db, close_id)
-    ledger.set_factor(factor_db, october["w2"], "DEFRA-2026-UK-diesel_l", "2026", core_actor(), "test")
+    ledger.set_factor(factor_db, october["w2"], "EGRID-2023-CAMX-electricity_kwh", "2023", core_actor(), "test")
     run.calculate(factor_db, close_id)
-    assert ledger.get_claim(factor_db, october["w2"]).factor_id == "DEFRA-2026-UK-diesel_l"
-    assert factor_db.execute("SELECT COUNT(*) FROM calculations WHERE claim_id=?", (october["w2"],)).fetchone()[0] == 2
-    assert ledger.latest_calculation(factor_db, october["w2"]).factor_id == "DEFRA-2026-UK-diesel_l"
+    assert ledger.get_claim(factor_db, october["w2"]).factor_id == "EGRID-2023-CAMX-electricity_kwh"
+    rows = factor_db.execute("SELECT COUNT(*) FROM calculations WHERE claim_id=?", (october["w2"],)).fetchone()[0]
+    assert rows == 2
+    assert ledger.latest_calculation(factor_db, october["w2"]).kgco2e == D("3510.66614453478")  # 18000 x 0.195037
+
+
+def test_a_factor_in_the_wrong_unit_is_refused_not_converted(factor_db, close_id, october):
+    from carbon_room.calc.units import UnsupportedUnit
+
+    ledger.set_factor(factor_db, october["w2"], "DEFRA-2026-UK-diesel_l", "2026", core_actor(), "wrong factor")
+    with pytest.raises(UnsupportedUnit):
+        run.calculate(factor_db, close_id)
 
 
 def core_actor():
@@ -160,7 +169,8 @@ def test_a_missing_catalogue_row_names_the_site_and_activity(db):
     from carbon_room import actors, config
     from carbon_room.calc import factors
 
-    close = ledger.create_close(db, "2026-10", ["hq"], config.load_config()["default_factor_set"], actors.CALCULATOR, "m")
+    default = config.load_config()["default_factor_set"]
+    close = ledger.create_close(db, "2026-10", ["hq"], default, actors.CALCULATOR, "m")
     db.commit()
     with pytest.raises(factors.FactorNotFound, match="hq"):
         run.choose_factor(db, ledger.get_close(db, close), claim())
