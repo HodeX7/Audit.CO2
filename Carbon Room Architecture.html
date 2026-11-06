@@ -1,0 +1,748 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Carbon Room Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky section index on the left, one reading column on the right; the system map is the centrepiece, ledger in the middle. */
+:root{
+  --bg:#f3f6f5; --surface:#ffffff; --surface-2:#e8eeeb; --fg:#15201c; --muted:#56645f; --line:#cbd6d1;
+  --accent:#0d6b5b; --accent-soft:#d5ebe5;
+  --p1:#2d58cf; --p2:#7a43c6; --p3:#be5216;
+  --ok:#1b7c45; --warn:#9d6306; --bad:#bb3227; --stale:#4a6a88;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1412; --surface:#151d1a; --surface-2:#1c2723; --fg:#e2eae6; --muted:#94a39d; --line:#2b3a35;
+    --accent:#4fc2a8; --accent-soft:#183a32;
+    --p1:#7d9cff; --p2:#b88ef2; --p3:#f08b52;
+    --ok:#53c784; --warn:#e2a73c; --bad:#f2766b; --stale:#93b3d1;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1412; --surface:#151d1a; --surface-2:#1c2723; --fg:#e2eae6; --muted:#94a39d; --line:#2b3a35;
+  --accent:#4fc2a8; --accent-soft:#183a32;
+  --p1:#7d9cff; --p2:#b88ef2; --p3:#f08b52;
+  --ok:#53c784; --warn:#e2a73c; --bad:#f2766b; --stale:#93b3d1;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15.5px;line-height:1.6;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.shell{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px;padding-block:40px 80px}
+nav.toc{position:sticky;top:calc(24px + env(safe-area-inset-top, 0px));align-self:start;font-size:13.5px}
+nav.toc .label{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+nav.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px;counter-reset:s}
+nav.toc a{display:block;padding:5px 10px;border-radius:6px;color:var(--muted);text-decoration:none}
+nav.toc a:hover,nav.toc a:focus-visible{background:var(--surface-2);color:var(--fg);outline:none}
+main{min-width:0;display:grid;gap:64px}
+section{min-width:0;display:grid;gap:18px;scroll-margin-top:20px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(34px,5vw,52px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:28px;font-weight:700;letter-spacing:-.01em}
+h3{font-size:18px;font-weight:600}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:18px;color:var(--fg);max-width:64ch}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+:not(pre)>code{background:var(--surface-2);padding:1px 5px;border-radius:4px}
+
+/* header facts */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.facts div{padding:12px 16px 12px 0}
+.facts dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.facts dd{margin:2px 0 0;font-weight:500}
+
+/* owner chips */
+.owner{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;font-weight:500;white-space:nowrap}
+.owner::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
+.o-P1{color:var(--p1)} .o-P2{color:var(--p2)} .o-P3{color:var(--p3)}
+.chip{display:inline-block;font-family:var(--f-mono);font-size:11px;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.yes{border-color:var(--accent);color:var(--accent)}
+.chip.later{border-style:dashed}
+.st{font-family:var(--f-mono);font-size:11.5px;font-weight:500;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.st-v{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.st-c{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.st-s{color:var(--stale);background:color-mix(in srgb,var(--stale) 14%,transparent)}
+.st-m{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.st-u{color:var(--muted);background:var(--surface-2)}
+
+/* map */
+.mapwrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:14px}
+.maptools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.maptools .label{font-size:13px;color:var(--muted);margin-right:4px}
+.fbtn{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.fbtn[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.fbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.svgscroll{overflow-x:auto}
+svg.map{display:block;width:100%;min-width:760px;height:auto}
+svg.map .edge{stroke:var(--line);stroke-width:1.6;fill:none}
+svg.map .bus{stroke:var(--muted);stroke-width:2;fill:none}
+svg.map .node rect.box{fill:var(--surface);stroke:var(--line);stroke-width:1.4;transition:opacity .15s}
+svg.map .node{cursor:pointer;transition:opacity .15s}
+svg.map .node:hover rect.box,svg.map .node:focus-visible rect.box{stroke:var(--fg)}
+svg.map .node:focus{outline:none}
+svg.map .node.sel rect.box{stroke:var(--accent);stroke-width:2.6}
+svg.map .node.dim{opacity:.22}
+svg.map .t1{font-family:var(--f-body);font-size:14px;font-weight:600;fill:var(--fg)}
+svg.map .t2{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+svg.map .hubbox{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+svg.map .hubt{font-family:var(--f-display);font-size:20px;font-weight:700;fill:var(--fg)}
+svg.map .lbl{font-family:var(--f-mono);font-size:10.5px;fill:var(--muted)}
+svg.map .dot-P1{fill:var(--p1)} svg.map .dot-P2{fill:var(--p2)} svg.map .dot-P3{fill:var(--p3)}
+.detail{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:8px;min-height:140px}
+.detail .row{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px}
+.detail .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.detail h3{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+
+/* callouts */
+.rule{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:16px 18px;display:grid;gap:6px;max-width:80ch}
+.rule strong{font-family:var(--f-display);font-size:17px}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--f-mono);font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+td.nw{white-space:nowrap}
+td .sub{color:var(--muted);font-size:13px}
+
+/* catalogue */
+.layer{display:grid;gap:0}
+.layer h3{padding-bottom:8px;border-bottom:2px solid var(--fg)}
+.comp{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);gap:20px;padding:14px 0;border-bottom:1px solid var(--line)}
+.comp .nm{display:grid;gap:4px;align-content:start}
+.comp .nm b{font-weight:600}
+.comp .never{color:var(--muted);font-size:14px}
+.comp .never::before{content:"Never: ";font-weight:600;color:var(--bad)}
+
+/* code */
+pre.code{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;font-family:var(--f-mono);font-size:13px;line-height:1.55}
+pre.code .c{color:var(--muted)}
+pre.code .f{color:var(--accent);font-weight:500}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto}
+pre.mermaid{margin:0;background:transparent}
+
+/* phases */
+.phases{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--f-mono);font-size:12.5px}
+.phases span{padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.phases i{font-style:normal;color:var(--muted)}
+
+/* owners */
+.owners{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ocol{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;align-content:start;border-top-width:4px}
+.ocol.P1{border-top-color:var(--p1)} .ocol.P2{border-top-color:var(--p2)} .ocol.P3{border-top-color:var(--p3)}
+.ocol ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.ocol .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+
+/* timeline */
+.tl{list-style:none;margin:0;padding:0;display:grid;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.tl li{position:relative;padding:0 0 18px 22px;display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px}
+.tl li::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+.tl li.hot::before{background:var(--accent)}
+.tl .when{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums}
+.tl b{font-weight:600}
+
+ol.risks{margin:0;padding-left:22px;display:grid;gap:10px;max-width:80ch}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px;display:grid;gap:6px}
+
+@media (max-width:980px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:28px;padding-block:24px 60px}
+  nav.toc{position:static}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:4px}
+  nav.toc a{border:1px solid var(--line);padding:3px 10px}
+  .owners{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:620px){
+  .comp{grid-template-columns:minmax(0,1fr);gap:6px}
+  .tl li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .detail .row{grid-template-columns:minmax(0,1fr);gap:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="shell">
+<nav class="toc" aria-label="Sections">
+  <div class="label">On this page</div>
+  <ol>
+    <li><a href="#map">System map</a></li>
+    <li><a href="#components">Components</a></li>
+    <li><a href="#seam">Core API seam</a></li>
+    <li><a href="#flow">How a close flows</a></li>
+    <li><a href="#rules">Watchdog rules</a></li>
+    <li><a href="#levers">Levers</a></li>
+    <li><a href="#switch">Switch spikes</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#owners">Who builds what</a></li>
+    <li><a href="#plan">Plan to Saturday</a></li>
+    <li><a href="#risks">Risks</a></li>
+  </ol>
+</nav>
+
+<main>
+<header style="display:grid;gap:18px">
+  <div class="eyebrow">Flip the Switch · Track 01 · Team-lead view</div>
+  <h1>Carbon Room Architecture</h1>
+  <p class="lede">A Switch chat room where a team closes a month of emissions. Agents collect bills, build one shared ledger and calculate. A rules-based Watchdog posts each missing, conflicting or stale item as a thread with a named owner. Humans fix it in that thread. Only VERIFIED rows count, and a human publishes.</p>
+  <dl class="facts">
+    <div><dt>Agent route</dt><dd>Direct Python client</dd></div>
+    <div><dt>Channel</dt><dd>Mattermost via Switch</dd></div>
+    <div><dt>Source of truth</dt><dd>SQLite ledger + graph</dd></div>
+    <div><dt>Freeze</dt><dd>Fri 6 Nov, 17:00 PT</dd></div>
+    <div><dt>Submissions close</dt><dd>Sat 7 Nov, 10:29 PT</dd></div>
+  </dl>
+  <div class="rule">
+    <strong>Thin agents, thick ledger.</strong>
+    <p>Every agent is a small piece of glue around one shared core. An LLM is used in exactly two places: <b>extraction</b> (bill text to a structured row) and <b>phrasing</b> (answering a person in plain words from ledger data). Every number and every status change comes from deterministic code. That keeps the demo repeatable and the Watchdog general, and it makes "the model reasons, code calculates, humans publish" true in the code.</p>
+  </div>
+</header>
+
+<section id="map">
+  <div class="eyebrow">01 · The whole system</div>
+  <h2>System map</h2>
+  <p class="muted">Select any box to see what it does, who owns it and what it must never do. Filter by owner to see one person's slice. Everything on this map is in the Friday build.</p>
+  <div class="mapwrap">
+    <div class="maptools" role="group" aria-label="Filter by owner">
+      <span class="label">Show</span>
+      <button class="fbtn" data-f="all" aria-pressed="true">Everyone</button>
+      <button class="fbtn" data-f="P1" aria-pressed="false"><span class="owner o-P1">P1 Ingestion &amp; Ledger</span></button>
+      <button class="fbtn" data-f="P2" aria-pressed="false"><span class="owner o-P2">P2 Calc, Checks &amp; Report</span></button>
+      <button class="fbtn" data-f="P3" aria-pressed="false"><span class="owner o-P3">P3 Switch Room &amp; Demo</span></button>
+    </div>
+    <div class="svgscroll">
+    <svg class="map" viewBox="0 0 1000 600" role="img" aria-label="Carbon Room system map with the ledger in the centre">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker>
+      </defs>
+      <!-- edges -->
+      <line class="edge" x1="265" y1="60" x2="390" y2="60" marker-end="url(#arr)" marker-start="url(#arr)"/>
+      <line class="edge" x1="610" y1="60" x2="735" y2="60" marker-end="url(#arr)" marker-start="url(#arr)"/>
+      <text class="lbl" x="328" y="50" text-anchor="middle">chat</text>
+      <text class="lbl" x="672" y="50" text-anchor="middle">ws + http</text>
+      <path class="bus" d="M850,90 L850,118 M200,118 L850,118 M200,118 L200,147 M400,118 L400,147 M600,118 L600,147 M800,118 L800,147"/>
+      <text class="lbl" x="500" y="112" text-anchor="middle">room events in · ops out</text>
+      <line class="edge" x1="200" y1="203" x2="420" y2="290"/>
+      <line class="edge" x1="400" y1="203" x2="460" y2="280"/>
+      <line class="edge" x1="600" y1="203" x2="540" y2="280"/>
+      <line class="edge" x1="800" y1="203" x2="600" y2="285"/>
+      <line class="edge" x1="400" y1="203" x2="225" y2="400"/>
+      <line class="edge" x1="600" y1="203" x2="770" y2="400"/>
+      <line class="edge" x1="200" y1="203" x2="345" y2="510"/>
+      <line class="edge" x1="135" y1="330" x2="135" y2="390"/>
+      <line class="edge" x1="135" y1="450" x2="135" y2="510"/>
+      <line class="edge" x1="240" y1="420" x2="360" y2="380"/>
+      <line class="edge" x1="760" y1="300" x2="640" y2="320"/>
+      <line class="edge" x1="760" y1="420" x2="640" y2="385"/>
+      <line class="edge" x1="430" y1="510" x2="460" y2="410"/>
+      <line class="edge" x1="580" y1="510" x2="545" y2="410"/>
+      <line class="edge" x1="790" y1="510" x2="630" y2="405"/>
+
+      <!-- hub -->
+      <g class="node" data-id="hub" tabindex="0" role="button" aria-label="Ledger and graph">
+        <rect class="box hubbox" x="360" y="280" width="280" height="130" rx="14"/>
+        <text class="hubt" x="500" y="318" text-anchor="middle">Ledger + graph</text>
+        <text class="t2" x="500" y="340" text-anchor="middle">SQLite · one file · authoritative</text>
+        <text class="t2" x="500" y="368" text-anchor="middle">claims · sources · factors</text>
+        <text class="t2" x="500" y="384" text-anchor="middle">calculations · gaps · events · locks</text>
+        <circle class="dot-P1" cx="624" cy="296" r="6"/>
+      </g>
+    </svg>
+    </div>
+    <div class="detail" id="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="eyebrow">02 · Every moving part</div>
+  <h2>Components</h2>
+  <p class="muted">Grouped by layer. "Later" items are the full-organisation story and are not built this week. In the MVP their jobs are folded into Watchdog rules and the Reporter.</p>
+  <div id="catalogue" style="display:grid;gap:28px"></div>
+</section>
+
+<section id="seam">
+  <div class="eyebrow">03 · The contract that lets three people build in parallel</div>
+  <h2>Core API seam</h2>
+  <p>Freeze these signatures on Wednesday. P1 and P2 implement them; P3 calls them from the room. Anyone can test the core without Switch through <code>python -m carbon_room &lt;cmd&gt;</code>.</p>
+<pre class="code"><span class="f">start_close</span>(month, sites, factor_set, actor, chat_message_id) -&gt; CloseId
+<span class="f">ingest</span>(close_id) -&gt; IngestReport            <span class="c"># claims created, all UNVERIFIED</span>
+<span class="f">calculate</span>(close_id) -&gt; list[Calculation]
+<span class="f">check</span>(close_id) -&gt; list[Finding]            <span class="c"># Watchdog; idempotent, safe to re-run</span>
+<span class="f">resolve</span>(gap_id, action, actor, chat_message_id, payload) -&gt; list[Finding]
+<span class="f">summary</span>(close_id) -&gt; CloseSummary           <span class="c"># verified_t, excluded_t, coverage_pct, source_coverage, gaps</span>
+<span class="f">draft_report</span>(close_id) -&gt; Report
+<span class="f">publish</span>(close_id, actor, chat_message_id) -&gt; PublishedReport
+<span class="f">trace</span>(tag) -&gt; SourceTag                     <span class="c"># S-### to file, page, excerpt, SHA, factor, recompute</span>
+<span class="f">verify_audit</span>(close_id) -&gt; AuditCheck</pre>
+  <div class="rule">
+    <strong>The rule that makes Switch load-bearing in code</strong>
+    <p>Every human action (<code>resolve</code>, any approval, <code>publish</code>) requires a <code>chat_message_id</code> and an actor that came from a Switch event. The CLI can ingest, calculate and check, so it can produce an unverified draft. It cannot verify a human-gated claim or publish. Without the room, there is no close.</p>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>Contract</th><th>Fields</th><th>Owner</th></tr></thead>
+    <tbody>
+      <tr><td class="nw"><b>Claim</b></td><td class="mono">claim_id, close_id, site, month, activity, value, unit, scope, source_doc_id, source_excerpt, source_sha256, factor_id, factor_version, status, extracted_by, checked_by, superseded_by</td><td><span class="owner o-P1">P1</span></td></tr>
+      <tr><td class="nw"><b>Finding</b> <span class="chip">new</span></td><td class="mono">finding_id, rule, kind, claim_ids[], site, month, owner, evidence[], options[], tier</td><td><span class="owner o-P2">P2</span></td></tr>
+      <tr><td class="nw"><b>Gap</b> <span class="chip">new</span></td><td class="mono">gap_id (G-#), finding_id, owner, status, thread_root_message_id, opened_at, resolved_by, resolved_message_id</td><td><span class="owner o-P2">P2</span></td></tr>
+      <tr><td class="nw"><b>Event</b></td><td class="mono">event_id, actor, claim_id, before_status, after_status, chat_message_id, timestamp, reason, prev_hash, hash</td><td><span class="owner o-P1">P1</span></td></tr>
+      <tr><td class="nw"><b>Close</b> <span class="chip">new</span></td><td class="mono">close_id, month, sites, factor_set, phase, version, published_by, published_message_id</td><td><span class="owner o-P1">P1</span></td></tr>
+      <tr><td class="nw"><b>Report JSON</b></td><td class="mono">verified_total_tCO2e, unverified_excluded_tCO2e, coverage_pct, gaps[], conflicts[], factor_versions[], approver, published_at, source_coverage, datacentre_line, s_tags[]</td><td><span class="owner o-P2">P2</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="flow">
+  <div class="eyebrow">04 · One close, end to end</div>
+  <h2>How a close flows</h2>
+  <p class="muted">The demo story as messages between people, the room, agents and the core. Totals are the brief's seeded example, not measured results. The 31.0 t / 61% interim figures are placeholders until the seed data exists.</p>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    actor Lead
+    actor Priya
+    participant Room as Mattermost + Switch
+    participant CR as @carbon-room
+    participant Col as @collector
+    participant WD as @watchdog
+    participant Rep as @reporter
+    participant Core as Core
+    Lead->>Room: @carbon-room close October
+    Room->>CR: message event, addressed
+    CR->>Core: start_close, factor set locked
+    CR->>Room: Close plan posted
+    CR->>Col: targeted message: collect
+    Col->>Core: ingest, all claims UNVERIFIED
+    Col->>Room: All October bills collected (false done)
+    CR->>Core: calculate
+    CR->>WD: targeted message: check
+    WD->>Core: check
+    WD->>Room: Thread G-1 MISSING Warehouse-2 bill, owner Priya
+    WD->>Room: Thread G-2 CONFLICTING HQ diesel, A vs B
+    WD->>Room: Thread G-3 STALE grid factor
+    WD->>Room: Thread G-4 reopened, the Oct bill is a Sep bill
+    CR->>Room: Refusal. Verified 31.0 t, coverage 61 pct
+    Priya->>Room: Reply in G-1 with the bill attached
+    Room->>WD: message event, thread_id = G-1
+    WD->>Core: resolve G-1, then ingest, calculate, re-check
+    WD->>Room: G-1 resolved, claim VERIFIED
+    Lead->>Room: Reply in G-2: pick A
+    WD->>Core: resolve G-2, B superseded, A verified
+    CR->>Room: Total moved 31.0 to 42.1 t, coverage 83 pct
+    CR->>Rep: targeted message: draft
+    Rep->>Core: draft_report
+    Rep->>Room: Draft with S-tags, DC line separate
+    Lead->>Room: @carbon-room publish
+    CR->>Core: publish with Lead and message id
+    CR->>Room: Published v1
+    Lead->>Room: @reporter trace S-014
+    Rep->>Room: Bill excerpt, SHA, factor, recompute
+  </pre></div>
+
+  <h3>Claim lifecycle</h3>
+  <p class="muted">Five statuses: <span class="st st-v">VERIFIED</span> <span class="st st-u">UNVERIFIED</span> <span class="st st-c">CONFLICTING</span> <span class="st st-s">STALE</span> <span class="st st-m">MISSING</span>. Only VERIFIED enters the total. MISSING is an expected source with no row yet, and a false "done" ends there.</p>
+  <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+    [*] --> UNVERIFIED: ingest
+    UNVERIFIED --> VERIFIED: rules pass and auto tier, or human approves
+    UNVERIFIED --> CONFLICTING: R2 conflict
+    UNVERIFIED --> STALE: R3 stale factor
+    CONFLICTING --> VERIFIED: human picks this one
+    CONFLICTING --> Superseded: human picks the other
+    STALE --> UNVERIFIED: recalculated with locked factor
+    MISSING --> UNVERIFIED: human supplies the source
+    VERIFIED --> Superseded: only by a new close version
+  </pre></div>
+
+  <h3>Close phases</h3>
+  <p class="muted">Stored on the close row in the ledger. LangGraph state is only a cache, so after a crash <code>@carbon-room resume</code> rebuilds from the ledger.</p>
+  <div class="phases">
+    <span>OPEN</span><i>→</i><span>COLLECTING</span><i>→</i><span>CALCULATING</span><i>→</i><span>CHECKING</span><i>→</i><span>AWAITING_HUMANS ⇄ RECHECKING</span><i>→</i><span>DRAFTED</span><i>→</i><span>PUBLISHED vN</span>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="eyebrow">05 · Why the traps fire</div>
+  <h2>Watchdog rules</h2>
+  <p>No rule names a site, a month or a claim id. The traps fire because the seed data breaks a general rule. <code>test_generalised.py</code> renames the sites, shifts the months and checks that every trap still fires.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Rule</th><th>Fires when</th><th>Result</th><th>Trap it catches</th></tr></thead>
+    <tbody>
+      <tr><td class="nw"><b>R1</b> Missing</td><td><code>sites.yaml</code> expects a source for a site and month, and no claim exists</td><td><span class="st st-m">MISSING</span> gap, owner is the site owner</td><td>Warehouse-2 October bill</td></tr>
+      <tr><td class="nw"><b>R2</b> Conflict</td><td>Two or more live claims for the same site, month and activity differ beyond tolerance</td><td><span class="st st-c">CONFLICTING</span>, both excerpts shown, reply "pick A" or "pick B"</td><td>HQ diesel, 400 L apart</td></tr>
+      <tr><td class="nw"><b>R3</b> Stale</td><td>Factor version differs from the locked set, or the factor is older than <code>max_age_months</code></td><td><span class="st st-s">STALE</span>, tonne difference shown</td><td>Last year's grid factor</td></tr>
+      <tr><td class="nw"><b>R4</b> Period</td><td>Billing period read from the source text differs from the claimed month, or the excerpt is not found verbatim</td><td>Claim reopened; the expected source becomes <span class="st st-m">MISSING</span></td><td>Mislabelled September bill (false done)</td></tr>
+      <tr><td class="nw"><b>R5</b> Variance</td><td>Change against last month of 10% or more</td><td>Needs Tier 2 human approval</td><td>HQ electricity +38%</td></tr>
+      <tr><td class="nw"><b>R6</b> Data centre</td><td>Cloud line has no location-based figure, or the AI line has no per-model data</td><td>DC line shown separately; AI line <span class="st st-u">UNVERIFIED</span>, excluded</td><td>Cloud invoice</td></tr>
+      <tr><td class="nw"><b>R7</b> Finance</td><td>Bill amount per kWh outside the tariff band</td><td>Flag only (optional)</td><td>None</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="levers">
+  <div class="eyebrow">06 · What the team can tune without touching code</div>
+  <h2>Levers</h2>
+  <p class="muted">All live in <code>config/carbon_room.yaml</code>, except roles, which live in <code>config/people.yaml</code>.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Lever</th><th>Default</th><th>Affects</th><th>In demo</th></tr></thead>
+    <tbody>
+      <tr><td><b>Close boundary</b></td><td>2026-10; HQ, Warehouse-2, DC EU-West</td><td>What R1 expects</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Factor set lock</b></td><td>DEFRA 2026 / EPA eGRID 2024 / Ember 2025</td><td>R3, calculator</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Variance threshold</b></td><td>10%</td><td>R5, Tier 1 or Tier 2</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Conflict tolerance</b></td><td>0.5% of value</td><td>R2</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Stale rule</b></td><td>Version must match lock; max age 12 months</td><td>R3</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Tier 1 auto-approve</b></td><td>Same factor as last month, variance under threshold, source present</td><td>How many approvals humans see</td><td><span class="chip">indirect</span></td></tr>
+      <tr><td><b>Approval input</b></td><td>Thread reply keywords: approve, pick A, reject. <b>Reactions do not count</b> because Switch does not deliver reaction events</td><td>Safety of the publish gate</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Who may approve or publish</b></td><td>Approve: lead, finance. Publish: lead</td><td>Gate security</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Coverage definition</b></td><td>Emissions coverage = verified t ÷ (verified + unverified computed t). Also source coverage = sources verified ÷ sources expected</td><td>The headline</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Budget per agent</b></td><td>Token cap per close; warn at 80%, stop at 100%</td><td>Runaway cost and loops</td><td><span class="chip">README</span></td></tr>
+      <tr><td><b>Noise rule</b></td><td>One top-level post per phase, one thread per gap, specialists speak only when addressed or owning a gap; target 12 top-level posts or fewer</td><td>Room readability</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Model</b></td><td>Provider and model id; temperature 0 for extraction</td><td>Extraction quality, cost, what data leaves</td><td><span class="chip">README</span></td></tr>
+      <tr><td><b>Extraction mode</b></td><td><code>replay</code> (cached by SHA, committed) or <code>live</code></td><td>Judges can reproduce without an API key</td><td><span class="chip">README</span></td></tr>
+      <tr><td><b>Agent addressing</b></td><td><code>anyone</code>, with the room limited to the close team</td><td>Which humans can instruct agents</td><td><span class="chip">README</span></td></tr>
+      <tr><td><b>Socket filter</b></td><td>@watchdog <code>filter=all</code> to see gap-thread replies; others <code>addressed</code></td><td>Routing</td><td><span class="chip">no</span></td></tr>
+      <tr><td><b>Data-centre policy</b></td><td>Location and market side by side, REC flag, PUE as reported, AI line UNVERIFIED</td><td>DC line</td><td><span class="chip yes">shown</span></td></tr>
+      <tr><td><b>Scope 3 policy</b></td><td>No categories computed; listed as "no data, not zero"</td><td>Credibility</td><td><span class="chip yes">one line</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="switch">
+  <div class="eyebrow">07 · What Switch gives us, and what we must prove today</div>
+  <h2>Switch integration and spikes</h2>
+  <p>From the docs: each agent is registered with its own key and gets a WebSocket of <code>message</code>, <code>command</code> and <code>room_join</code> events. Message events carry <code>message_id</code>, <code>thread_id</code>, <code>sender</code>, <code>attachments</code> and <code>addressed</code>. Agents act through HTTP ops such as <code>post_message</code>, <code>send_targeted_message</code>, <code>read_context</code> and the room-document ops. <b>There is no client library</b>, so we implement the protocol ourselves.</p>
+  <div class="rule">
+    <strong>Room-client rule: never block the socket</strong>
+    <p>Switch pings every 2 seconds and evicts a connection that is silent for 6. Events go onto a queue, and workers run core and LLM calls in a thread pool. One slow extraction on the socket loop drops the agent mid-demo.</p>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Question (owner P3, answer by Wed 18:00 PT)</th><th>How to test</th><th>Fallback if it fails</th></tr></thead>
+    <tbody>
+      <tr><td class="nw"><b>S1</b></td><td>Can <code>post_message</code> reply into a thread?</td><td><code>GET /agents/{id}/ops</code> shows the input schema</td><td>Gap ids in the text; people reply "G-2 pick A" in the channel; the router parses the id</td></tr>
+      <tr><td class="nw"><b>S2</b></td><td>Can an agent download a file a person attaches?</td><td>Follow the attachment's <code>mxc</code> pointer to a media route</td><td>Person attaches in the room for the record; Collector reads the same file from <code>data/inbox/</code> and checks its SHA. README says so</td></tr>
+      <tr><td class="nw"><b>S3</b></td><td>Can the bundled Mattermost hold 2–3 human accounts (Lead, Priya)?</td><td>Create users in Mattermost admin</td><td>One human account; roles declared in <code>people.yaml</code>; README says so</td></tr>
+      <tr><td class="nw"><b>S4</b></td><td>Can one process hold 4 agent sockets and keep pong under 2 s during LLM calls?</td><td>Run 4 sockets with a 10 s sleep in a worker</td><td>One visible agent, @carbon-room, posting with [Watchdog]-style prefixes</td></tr>
+      <tr><td class="nw"><b>S5</b></td><td>Does <code>post_message</code> return the new message id?</td><td>Inspect the result</td><td><code>read_context</code> right after posting</td></tr>
+      <tr><td class="nw"><b>S6</b></td><td>Do room documents show to people in Mattermost?</td><td>Create one and look</td><td>Close Board as a normal post at the end of each phase</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Route check, Thu 10:00 PT.</b> If S1, S4 and the basic post-and-receive loop are not working by then, switch to Claude Code as the room agent (supported by Switch out of the box) with the core exposed as MCP tools. Only the room layer changes; core, ledger and rules stay as they are. The README must then say so plainly.</p>
+  <p><b>What breaks if Switch is removed:</b> no gap threads, no human resolutions (each needs a Switch message id), no approvals, no publish, no trace in the room. The core can still produce an unverified draft, and that is all.</p>
+</section>
+
+<section id="decisions">
+  <div class="eyebrow">08 · The brief's open questions, settled</div>
+  <h2>Decisions</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Question</th><th>Decision</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Agent backend</td><td>Direct Python client; route check Thu 10:00 PT</td><td>The core/room split keeps the Claude Code fallback cheap</td></tr>
+      <tr><td>Compliance</td><td>Checklist step inside Reporter, not a fifth agent</td><td>Four identities already prove the teammate model; a fifth adds noise</td></tr>
+      <tr><td>Channel</td><td>Mattermost</td><td>Ships with Switch, no workspace setup, judges can reproduce it</td></tr>
+      <tr><td>Graph store</td><td>SQLite graph-lite</td><td>No demo query needs Neo4j; a trace is a four-table join</td></tr>
+      <tr><td>Wispr Flow</td><td>Building only, if someone already uses it; not a component</td><td>It is a human-side tool</td></tr>
+      <tr><td>Scope 3</td><td>Not computed; listed as "no data, not zero"</td><td>Credible, and avoids an "all of Scope 3" claim</td></tr>
+      <tr><td>Data-centre line</td><td>Location vs market side by side, REC flag, PUE as reported, AI line UNVERIFIED; WUE only if on the invoice</td><td>Every number has a source; the gap is the point</td></tr>
+      <tr><td>Publish flow</td><td>Lead approves Tier 2 items and publishes; Finance approval is a lever, off for the demo</td><td>One approver fits 90 seconds and the gate is still real</td></tr>
+      <tr><td>Budgets and locks</td><td>Built and tested, shown in README, not in the video</td><td>No demo seconds to spare</td></tr>
+      <tr><td>Audit hash chain</td><td>In. <code>@reporter verify audit</code> answers "chain intact, N events"</td><td>Cheap, and a judge can check it in the room</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="owners">
+  <div class="eyebrow">09 · Coordination</div>
+  <h2>Who builds what</h2>
+  <div class="owners" id="owners-cols"></div>
+  <h3>Seams and freeze times</h3>
+  <p class="muted">Until the core exists, P3 builds the room client against a fake <code>core.py</code> kept in <code>tests/</code>. It never sits on the run path.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Seam</th><th>Producer</th><th>Consumer</th><th>Freeze by (PT)</th></tr></thead>
+    <tbody>
+      <tr><td><code>schema.sql</code> and core API signatures</td><td><span class="owner o-P1">P1</span></td><td>P2, P3</td><td class="nw">Wed 12:00</td></tr>
+      <tr><td>Seed data and trap list</td><td><span class="owner o-P1">P1</span></td><td>P2</td><td class="nw">Wed 15:00</td></tr>
+      <tr><td>Finding and Gap shape, reply options wording</td><td><span class="owner o-P2">P2</span></td><td>P3</td><td class="nw">Wed 15:00</td></tr>
+      <tr><td>Spike answers S1–S6</td><td><span class="owner o-P3">P3</span></td><td>All</td><td class="nw">Wed 18:00</td></tr>
+      <tr><td>Room message templates</td><td><span class="owner o-P3">P3</span></td><td>P2 reviews</td><td class="nw">Thu 10:00</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Repo layout</h3>
+<pre class="code">carbon-room/
+├─ README.md · Makefile (setup, seed, register, run, reset-demo, test)      <span class="c">P3</span>
+├─ config/  carbon_room.yaml <span class="c">P2</span> · sites.yaml <span class="c">P1</span> · people.yaml <span class="c">P3</span> · factors.csv <span class="c">P2</span>
+├─ data/seed/2026-09, 2026-10/  ·  data/cache/extractions/                  <span class="c">P1</span>
+├─ carbon_room/
+│  ├─ core.py                              <span class="c">P1  the API above</span>
+│  ├─ ledger/   schema.sql ledger.py audit.py locks.py              <span class="c">P1</span>
+│  ├─ sources/  store.py extract.py   ·   llm.py                    <span class="c">P1</span>
+│  ├─ calc/     calculator.py units.py factors.py                   <span class="c">P2</span>
+│  ├─ checks/   rules.py approvals.py                               <span class="c">P2</span>
+│  ├─ report/   reporter.py stags.py compliance.py templates/       <span class="c">P2</span>
+│  ├─ room/     switch_client.py router.py register.py board.py     <span class="c">P3</span>
+│  └─ agents/   orchestrator.py (LangGraph) messages.py             <span class="c">P3</span>
+└─ tests/  test_traps · test_generalised · test_calc_recompute · test_audit_chain · test_publish_needs_room</pre>
+</section>
+
+<section id="plan">
+  <div class="eyebrow">10 · Nothing is built yet, so the plan is compressed</div>
+  <h2>Plan to Saturday</h2>
+  <p class="muted">The brief planned Thursday as a polish day. Because the build starts today, polish moves to Friday morning.</p>
+  <ol class="tl">
+    <li class="hot"><span class="when">Wed 12:00</span><span><b>M0 Contracts.</b> Repo skeleton, <code>schema.sql</code>, core signatures and config files merged.</span></li>
+    <li class="hot"><span class="when">Wed 18:00</span><span><b>M1 Spikes.</b> S1–S6 answered and fallbacks chosen.</span></li>
+    <li><span class="when">Wed night</span><span><b>M2 Walking skeleton.</b> "@carbon-room close October" turns one HQ electricity bill into a ledger row, a calculation and a verified total posted in the room.</span></li>
+    <li><span class="when">Thu 10:00</span><span><b>Route check.</b> Direct client works, or switch to the Claude Code fallback.</span></li>
+    <li><span class="when">Thu 14:00</span><span><b>M3 Traps.</b> All four traps fire in <code>test_traps.py</code> and post as threads; one human resolution moves the total live.</span></li>
+    <li><span class="when">Thu night</span><span><b>M4 Close end to end.</b> Reporter, publish gate, S-tag trace, DC line, Close Board. First out-loud 90-second rehearsal.</span></li>
+    <li><span class="when">Fri 12:00</span><span><b>M5 Reproducible.</b> Someone who did not write the setup clones and runs it on a clean machine. README complete.</span></li>
+    <li><span class="when">Fri 17:00</span><span><b>M6 Recorded, freeze.</b> Demo video and recorded fallback from the same run.</span></li>
+    <li><span class="when">Sat 10:00</span><span><b>Submit.</b> 29 minutes of buffer before the 10:29 close.</span></li>
+  </ol>
+</section>
+
+<section id="risks">
+  <div class="eyebrow">11 · What is most likely to break</div>
+  <h2>Risks</h2>
+  <ol class="risks">
+    <li><b>Heartbeat eviction.</b> An LLM call on the socket loop misses a pong and the agent drops out mid-demo. Fix: queue and worker pool.</li>
+    <li><b>Threads, attachments and multiple accounts are unproven</b> (S1–S3). Each has a fallback; decide by Wednesday evening, not Thursday.</li>
+    <li><b>Extraction varies run to run.</b> Fix: replay cache keyed by SHA, plus the verbatim-excerpt check.</li>
+    <li><b>Hard-coded traps or totals.</b> Fix: general rules, <code>test_generalised.py</code>, and totals always computed from VERIFIED rows.</li>
+    <li><b>Clean-machine setup.</b> Switch Console and Docker download several GB on first start. Fix: README lists versions and the download, and M5 is scheduled before the freeze.</li>
+  </ol>
+</section>
+
+<footer>
+  <span>Sources: Carbon Room full brief (team pack), Flip the Switch page on devtoolsacademy.com, and docs.switchagents.ai (agent protocol, agent events, payments room, working safely), read Wed 4 Nov 2026.</span>
+  <span>All totals and percentages are the brief's seeded demo example, not measured results. Regulatory content in the brief is general information, not legal advice.</span>
+</footer>
+</main>
+</div>
+
+<script>
+(function(){
+  var OWNERS = {P1:"Ingestion & Ledger", P2:"Calculation, Checks & Report", P3:"Switch Room, Demo & Submission"};
+  var C = [
+    {id:"humans",x:150,y:60,w:230,name:"Humans in Mattermost",sub:"Lead · Priya · Finance · Auditor",layer:"Room",owner:"P3",
+     does:"The close team talks to agents in #october-close. They resolve gaps by replying in threads and publish with a command.",
+     never:"Approve by reaction or by silence.",io:"Send messages, thread replies and attachments. Receive gap threads, phase summaries and the draft report."},
+    {id:"switch",x:500,y:60,w:220,name:"Switch server",sub:"bridge · gateway · sessions",layer:"Room",owner:"P3",
+     does:"Runs in Docker through Switch Console. Bridges Mattermost to agents, holds sessions, issues agent API keys from the Gateway.",
+     never:"Hold business state. The ledger is the state.",io:"WebSocket events (message, command, room_join) out to agents; HTTP ops in from agents."},
+    {id:"client",x:850,y:60,w:230,name:"Room client + router",sub:"4 sockets · pong · thread→gap",layer:"Room",owner:"P3",
+     does:"One asyncio process with four sockets, one per agent key. Answers ping with pong inside 2 seconds. Routes a mention to its agent, a thread_id to its gap, and a sender to a person and role from people.yaml.",
+     never:"Run an LLM or ledger call on the socket loop.",io:"In: Switch events. Out: post_message, send_targeted_message, read_context, update_room_document."},
+    {id:"orch",x:200,y:175,w:170,name:"@carbon-room",sub:"Orchestrator · LangGraph",layer:"Agents",owner:"P3",
+     does:"Takes commands, locks the boundary and factor set, runs the close phases, posts one summary per phase and owns the publish gate. The only agent that states a total.",
+     never:"Publish without a human command, or change a factor after lock.",io:"Calls start_close, calculate, summary and publish. Writes the Close Board."},
+    {id:"coll",x:400,y:175,w:170,name:"@collector",sub:"ingest",layer:"Agents",owner:"P1",
+     does:"Ingests every seeded source into the store and the ledger, then reports what it collected. Its 'all collected' statement is checked, never trusted.",
+     never:"Mark anything VERIFIED.",io:"Calls ingest."},
+    {id:"wd",x:600,y:175,w:170,name:"@watchdog",sub:"check · re-check",layer:"Agents",owner:"P2",
+     does:"Runs rules R1–R7, posts one thread per finding with an owner and reply options, re-checks after every human reply, and reopens a false 'done'.",
+     never:"Auto-resolve a conflict or pick the newest.",io:"Calls check and resolve. Listens with filter=all so it sees replies in gap threads."},
+    {id:"rep",x:800,y:175,w:170,name:"@reporter",sub:"draft · trace",layer:"Agents",owner:"P2",
+     does:"Drafts the report from VERIFIED rows, adds S-tags and the compliance checklist, and answers 'trace S-###' and 'verify audit' in the room.",
+     never:"Publish, or count unverified rows in the total.",io:"Calls draft_report, trace and verify_audit."},
+    {id:"hub",hub:true,name:"Ledger + graph (SQLite)",layer:"Core",owner:"P1",
+     does:"One file holding claims, sources, factors, calculations, gaps, approvals, events and locks. The graph is foreign keys plus an edges view. The authoritative state of every close, including its phase.",
+     never:"Delete a row. Supersede only.",io:"Read and written only through core.py."},
+    {id:"seed",x:135,y:300,w:210,name:"Seed data",sub:"Sep + Oct bills, 4 traps",layer:"Inputs",owner:"P1",
+     does:"September 2026 (clean) and October 2026 sources for HQ, Warehouse-2 and DC EU-West: utility PDFs, diesel invoices as .eml, a Drive CSV and a cloud invoice JSON. The traps live in the data, not in the code.",
+     never:"Be named in a rule.",io:"Read by the extractor."},
+    {id:"store",x:135,y:420,w:210,name:"Source store + Extractor",sub:"SHA-256 · verbatim excerpt",layer:"Core",owner:"P1",
+     does:"Copies each source, records SHA-256, page and raw text, and extracts activity rows with an exact excerpt. A row is accepted only if the excerpt appears verbatim and contains the value; otherwise it becomes a MISSING gap marked unreadable. Results are cached by SHA for replay.",
+     never:"Guess from an unreadable source or paraphrase the excerpt.",io:"In: seed files and human uploads. Out: source rows and UNVERIFIED claims."},
+    {id:"llm",x:135,y:540,w:210,name:"Model adapter",sub:"extract · phrase only",layer:"Core",owner:"P1",
+     does:"Two functions: extract (bill text to a structured activity) and phrase (ledger data to a plain answer). Model, temperature and budget come from config. Replay mode reads cached results.",
+     never:"Do arithmetic or decide a status.",io:"Called by the extractor, and by agents when they phrase an answer."},
+    {id:"calc",x:865,y:300,w:210,name:"Calculator + factors",sub:"Decimal · locked set",layer:"Core",owner:"P2",
+     does:"Multiplies activity by factor in Decimal, with a unit table in code. Writes a Calculation row with the formula and factor version. The factor set is locked per close: DEFRA 2026 / EPA eGRID 2024 / Ember 2025.",
+     never:"Use an LLM or an unlocked factor.",io:"Reads claims and factors; writes calculations."},
+    {id:"rules",x:865,y:420,w:210,name:"Watchdog rules R1–R7",sub:"general · config-driven",layer:"Core",owner:"P2",
+     does:"Checks for missing sources, conflicts, stale factors, wrong billing periods, variance, data-centre gaps and finance outliers. Returns Findings with evidence and reply options.",
+     never:"Name a specific site, month or claim id.",io:"Reads the ledger and source text; returns Findings."},
+    {id:"approvals",x:370,y:540,w:190,name:"Approval gates",sub:"auto · approve · publish",layer:"Core",owner:"P2",
+     does:"Tier 1 auto (same factor, variance under 10%, source present). Tier 2 human approval by thread reply. Tier 3 human publish. Checks the approver's role in people.yaml.",
+     never:"Approve by silence, or accept an action without a Switch chat_message_id.",io:"Called by resolve and publish."},
+    {id:"audit",x:590,y:540,w:190,name:"Audit chain",sub:"append-only · hashed",layer:"Core",owner:"P1",
+     does:"Append-only events: actor, claim, status before and after, chat_message_id, time. Each hash is sha256 of the previous hash plus the event. verify_audit walks the chain.",
+     never:"Update or delete an event.",io:"Written on every status change."},
+    {id:"report",x:865,y:540,w:210,name:"Report pack + Close Board",sub:"JSON · PDF · S-tags",layer:"Outputs",owner:"P2",
+     does:"Report JSON, Markdown/PDF pack, coverage slide, S-tags, a separate data-centre line and compliance wording flags. The Close Board room document shows live coverage and open gaps.",
+     never:"Present an estimate as verified.",io:"Writes out/2026-10/vN/ and one room document."}
+  ];
+  var LATER = [
+    {name:"Scope 1, 2 and 3 agents",layer:"Agents",does:"Separate domain teammates for fuel, purchased energy and supply chain. In the MVP these are rows in the rules and the calculator."},
+    {name:"Data-centre / AI agent",layer:"Agents",does:"A teammate for PUE, WUE, REC quality and the AI line. In the MVP this is rule R6 and the Reporter's DC line."},
+    {name:"Finance Reconciler",layer:"Agents",does:"Cross-checks against a real finance system. In the MVP it is optional rule R7 on bill amounts."},
+    {name:"Gap Chaser",layer:"Agents",does:"Nudges and escalates owners against deadlines. In the MVP each gap thread names its owner."},
+    {name:"Compliance agent",layer:"Agents",does:"A visible @compliance teammate. In the MVP it is a wording checklist inside the Reporter."},
+    {name:"Auditor room and multi-month carry-forward",layer:"Outputs",does:"A separate read-only view for auditors, and gaps and factors carried from one close to the next."}
+  ];
+
+  var NS = "http://www.w3.org/2000/svg";
+  var svg = document.querySelector("svg.map");
+  var hubEl = svg.querySelector('[data-id="hub"]');
+  function el(tag, attrs, text){ var e=document.createElementNS(NS,tag); for(var k in attrs){e.setAttribute(k,attrs[k]);} if(text){e.textContent=text;} return e; }
+
+  C.forEach(function(c){
+    if(c.hub){ c.node = hubEl; return; }
+    var h = 56, x = c.x - c.w/2, y = c.y - h/2;
+    var g = el("g",{"class":"node","data-id":c.id,tabindex:"0",role:"button","aria-label":c.name});
+    g.appendChild(el("rect",{"class":"box",x:x,y:y,width:c.w,height:h,rx:"9"}));
+    g.appendChild(el("text",{"class":"t1",x:c.x,y:c.y-3,"text-anchor":"middle"},c.name));
+    g.appendChild(el("text",{"class":"t2",x:c.x,y:c.y+15,"text-anchor":"middle"},c.sub));
+    g.appendChild(el("circle",{"class":"dot-"+c.owner,cx:x+c.w-11,cy:y+11,r:"5"}));
+    svg.insertBefore(g, hubEl);
+    c.node = g;
+  });
+
+  var detail = document.getElementById("detail");
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function show(id){
+    var c = C.filter(function(x){return x.id===id;})[0]; if(!c) return;
+    C.forEach(function(x){ x.node.classList.toggle("sel", x.id===id); });
+    detail.innerHTML =
+      '<h3>'+esc(c.name)+' <span class="owner o-'+c.owner+'">'+c.owner+' · '+esc(OWNERS[c.owner])+'</span> <span class="chip">'+esc(c.layer)+'</span></h3>'+
+      '<div class="row"><span class="k">Does</span><span>'+esc(c.does)+'</span></div>'+
+      '<div class="row"><span class="k">Talks to</span><span>'+esc(c.io)+'</span></div>'+
+      '<div class="row"><span class="k">Never</span><span>'+esc(c.never)+'</span></div>';
+  }
+  C.forEach(function(c){
+    c.node.addEventListener("click", function(){ show(c.id); });
+    c.node.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); show(c.id); } });
+  });
+  show("hub");
+
+  var btns = document.querySelectorAll(".fbtn");
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){
+      var f = b.getAttribute("data-f");
+      btns.forEach(function(o){ o.setAttribute("aria-pressed", o===b ? "true" : "false"); });
+      C.forEach(function(c){ c.node.classList.toggle("dim", f!=="all" && c.owner!==f); });
+      if(f!=="all"){ var first = C.filter(function(c){return c.owner===f;})[0]; if(first) show(first.id); }
+    });
+  });
+
+  // catalogue
+  var layers = ["Room","Agents","Core","Inputs","Outputs"];
+  var LNAME = {Room:"Room layer (Switch)",Agents:"Agents (room identities)",Core:"Core (shared truth)",Inputs:"Inputs",Outputs:"Outputs"};
+  var cat = document.getElementById("catalogue"), html = "";
+  layers.forEach(function(L){
+    var items = C.filter(function(c){return c.layer===L;});
+    var later = LATER.filter(function(c){return c.layer===L;});
+    if(!items.length && !later.length) return;
+    html += '<div class="layer"><h3>'+LNAME[L]+'</h3>';
+    items.forEach(function(c){
+      html += '<div class="comp"><div class="nm"><b>'+esc(c.name)+'</b><span class="owner o-'+c.owner+'">'+c.owner+'</span><span><span class="chip yes">MVP</span></span></div>'+
+              '<div style="display:grid;gap:6px;min-width:0"><span>'+esc(c.does)+'</span><span class="never">'+esc(c.never)+'</span></div></div>';
+    });
+    later.forEach(function(c){
+      html += '<div class="comp"><div class="nm"><b>'+esc(c.name)+'</b><span><span class="chip later">Later</span></span></div>'+
+              '<div style="min-width:0" class="muted">'+esc(c.does)+'</div></div>';
+    });
+    html += '</div>';
+  });
+  cat.innerHTML = html;
+
+  // owner columns
+  var EXTRA = {
+    P1:{seams:["Owns schema.sql and core.py signatures","Builds the seed data with the four traps","Audit chain, locks, budgets, replay cache"],tests:"test_audit_chain, test_publish_needs_room"},
+    P2:{seams:["Owns the Finding and Gap shape","Owns carbon_room.yaml levers and factors.csv","Report JSON, S-tags, DC line, compliance checklist"],tests:"test_traps, test_generalised, test_calc_recompute"},
+    P3:{seams:["Runs spikes S1–S6 today","Owns people.yaml and room message templates","README, Makefile, clean-machine run, video and fallback recording"],tests:"Room loop smoke test against the fake core"}
+  };
+  var oc = document.getElementById("owners-cols"), oh = "";
+  ["P1","P2","P3"].forEach(function(o){
+    var mine = C.filter(function(c){return c.owner===o;});
+    oh += '<div class="ocol '+o+'"><span class="owner o-'+o+'">'+o+'</span><h3>'+esc(OWNERS[o])+'</h3>'+
+          '<span class="k">Components</span><ul>'+mine.map(function(c){return '<li>'+esc(c.name)+'</li>';}).join("")+'</ul>'+
+          '<span class="k">Also owns</span><ul>'+EXTRA[o].seams.map(function(s){return '<li>'+esc(s)+'</li>';}).join("")+'</ul>'+
+          '<span class="k">Tests</span><span style="font-size:14px">'+esc(EXTRA[o].tests)+'</span></div>';
+  });
+  oc.innerHTML = oh;
+})();
+</script>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+
+</body></html>
