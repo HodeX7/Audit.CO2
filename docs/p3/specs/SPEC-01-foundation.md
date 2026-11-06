@@ -225,7 +225,9 @@ class FakeRoom:                      # satisfies ports.Room
     - Returns `IngestReport(close_id, 9, ["CL-0001", …, "CL-0009"], [], f"All 5 {Month} sources collected.")`,
       where `{Month}` is the English month name of the close's month, for example `October`.
 17. **`ingest_file(close_id, path, actor, chat_message_id, site=None)`** raises `NeedsRoomEvent` for a human
-    actor with an empty message id. Otherwise it returns `["CL-0010"]` and changes nothing.
+    actor with an empty message id. Otherwise it returns `["CL-0010"]` and changes nothing. It is the one
+    exception to rule 12: it doesn't look up the close, so an unknown `close_id` doesn't raise.
+    `test_calls_record_bound_arguments` calls it with the dummy close `"c"`, and no room code calls it directly.
 18. **`calculate(close_id)`** sets the phase and returns `[]`.
 19. **`check(close_id)`.**
     - The first call opens G-1…G-4 exactly as in §7.1, with `thread_root_message_id=None`,

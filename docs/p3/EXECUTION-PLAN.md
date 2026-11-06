@@ -708,6 +708,7 @@ class OpsClient:
                  timeout: float = 10.0) -> None
     connection_id: str | None                  # settable after the socket opens
     async def list_ops(self) -> dict[str, dict]
+    async def connect_room(self) -> dict          # connect_to_room once; room-scoped ops call it first
     async def call(self, op: str, args: dict | None = None) -> Any
     async def post(self, text: str, thread_id: str | None = None) -> str
     async def send_targeted(self, to_agent: str, text: str) -> Any
@@ -717,11 +718,15 @@ class OpsClient:
     async def aclose(self) -> None
 ```
 
-S08 is written after spike M2, so the exact argument names come from `docs/switch-ops.json`. SPEC-08 adds two
-things:
-- Module constants for those names (`POST_TEXT_ARG`, `POST_THREAD_ARG`, `POST_ID_KEY` and others), which
-  SPEC-15's loop test reads.
+The argument names come from the schemas in `docs/switch-ops.json`. SPEC-08 adds three things:
+- Module constants for those names (`POST_TEXT_ARG="body"`, `POST_THREAD_ARG="thread_id"`,
+  `POST_ID_KEY="event_id"` and others), which SPEC-15's loop test reads.
 - An `agent_ids: Mapping[str, str] | None = None` keyword on `__init__`.
+- `async def connect_room(self) -> dict`. It calls `connect_to_room` once, lazily, before the first room-scoped
+  op, because `post_message` posts to the session's connected room and has no `room_id` argument.
+
+`read_context` returns threads (`{"threads": [{"root", "replies"}]}`), which the client flattens. Room documents
+are updated by `document_id`. Spikes S1, S5 and S6 still need a live check (SPEC-08 §8).
 
 ### 3.12 `room/connection.py` (S07)
 
@@ -912,7 +917,7 @@ Wave 1 (parallel)       S02 grammar · S03 identity · S04 errors · S05 message
                         S06 settings+events · S07 connection+fake switch       M2 spikes (you + interactive session)
                         S09 register (starts once S06 merges; M2 can use curl until then)
 Wave 2 (parallel)       S08 ops (needs M2) · S10 dispatcher (S02,S06) · S11 router+attachments (S02,S06)
-                        S16 Makefile/doctor/reset (S06,S03; reset's room part needs S08)
+                        S16 Makefile/doctor/local reset (S06,S03) · S16B room reset (S08, S16)
 Wave 3                  S12 close flow (S01,S05) ──► S13 resolution/publish/reports/ask (S04,S11,S12)
                                                 └──► S14 hygiene: resume, notices, noise, board (S12)
 Wave 4                  S15 app wiring + runner + e2e (everything above) ──► M3 people.yaml real ids
@@ -1823,6 +1828,9 @@ def main() -> int
 - [ ] The loop test passes in under 20 s with no real Switch.
 
 ### S16 · Makefile, `make doctor`, `make reset-demo`
+
+> **Split.** The archive-and-recreate room part moved to SPEC-16B (`docs/p3/specs/SPEC-16B-room-reset.md`),
+> because it needs S08 and M2's op names. S16 covers the Makefile, the doctor and the local reset only.
 **Stories:** 6.1, 6.2, 6.3 · **Wave:** 2 · **Depends on:** S03, S06; S08 for the room part of reset
 **Read:** contracts §9 (`llm.mode`); plan §1.3 and §3.10; stories 6.1–6.3; `carbon_room/__main__.py`;
 `carbon_room/sources/cache.py` (cache path only; do not import it).

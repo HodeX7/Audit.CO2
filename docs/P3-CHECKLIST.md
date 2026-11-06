@@ -34,32 +34,34 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · (cut) = drop first if l
 
 ## Wave 0
 
-- [ ] S01 Foundation: ports, AsyncCore, frames, fake core, fake room (8.1)
+- [x] S01 Foundation: ports, AsyncCore, frames, fake core, fake room (8.1)
 
 ## Wave 1 (parallel)
 
-- [ ] S02 Grammar parser (3.1)
-- [ ] S03 Identity + `people.yaml` (3.2, 1.9 template)
-- [ ] S04 Actionable errors (3.5)
-- [ ] S05 Message templates (5.1)
-- [ ] S06 Settings + event decoding (2.2)
-- [ ] S07 Agent connection + fake Switch server (2.1, 8.2)
-- [ ] S09 Agent registration (1.2), after S06 merges
+- [x] S02 Grammar parser (3.1)
+- [x] S03 Identity + `people.yaml` (3.2, 1.9 template)
+- [x] S04 Actionable errors (3.5)
+- [x] S05 Message templates (5.1)
+- [x] S06 Settings + event decoding (2.2)
+- [x] S07 Agent connection + fake Switch server (2.1, 8.2)
+- [x] S09 Agent registration (1.2), after S06 merges
 - [ ] M2 Spikes S1–S6, spike summary to the team, route check (1.3–1.8, 1.10)
 
 ## Wave 2 (parallel)
 
-- [ ] S08 Ops client (2.3), after M2
-- [ ] S10 Dispatcher + worker lanes (2.4)
-- [ ] S11 Router + attachments (3.3, 3.4, 2.6)
-- [ ] S16 Makefile, doctor, reset-demo (6.1–6.3)
+- [ ] S08 Ops client (2.3): spec ready from the switch-ops.json schemas; live check after merge
+- [x] S10 Dispatcher + worker lanes (2.4)
+- [x] S11 Router + attachments (3.3, 3.4, 2.6)
+- [x] S16 Makefile, doctor, local reset-demo (6.1–6.3)
+- [ ] S16B Room reset: archive and recreate with the agents in it (6.3), after S08
+- [ ] S09B Addressing set with another agent's key (1.2 fix; `update_agent_detail` refuses self)
 - [ ] M3 Real sender ids in `people.yaml` (1.9)
 
 ## Wave 3
 
-- [ ] S12 Close flow: orchestrator + gap roots (4.1–4.4)
-- [ ] S13 Resolution, publish, reports, ask (4.5, 4.6, 5.4)
-- [ ] S14 Resume, budget notices (cut), noise guard, Close Board (cut) (4.7, 4.8, 5.3, 5.2)
+- [x] S12 Close flow: orchestrator + gap roots (4.1–4.4)
+- [x] S13 Resolution, publish, reports, ask (4.5, 4.6, 5.4)
+- [x] S14 Resume, budget notices (cut), noise guard, Close Board (cut) (4.7, 4.8, 5.3, 5.2)
 
 ## Wave 4
 
