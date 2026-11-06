@@ -1,0 +1,5 @@
+people:
+  - { id: lead,    name: "Sustainability Lead", role: lead,         username: lead,  switch_ids: ["@switch-user-lead:test"] }
+  - { id: priya,   name: "Priya",               role: site_manager, username: priya, sites: [warehouse-2], switch_ids: ["@switch-user-priya:test"] }
+  - { id: finance, name: "Finance Approver",    role: finance,      username: "",    switch_ids: [] }
+  - { id: auditor, name: "External Auditor",    role: auditor,      username: "",    switch_ids: [] }

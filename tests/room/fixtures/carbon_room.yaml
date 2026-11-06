@@ -1,0 +1,10 @@
+factor_sets:
+  FS-2026-10: { DEFRA: "2026", EGRID: "2024", EMBER: "2025" }
+default_factor_set: FS-2026-10
+budgets:
+  default_tokens: 200000
+  warn_at: 0.8
+llm:
+  mode: rules
+noise:
+  max_top_level_posts: 12
