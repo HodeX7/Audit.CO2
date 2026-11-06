@@ -120,3 +120,33 @@ async def handle_close_start(ctx: Context, event: RoomEvent, intent: Intent, act
         "findings": [],
     }
     await build_close_graph(ctx).ainvoke(state, {"configurable": {"thread_id": close_id}})
+
+
+async def resume(ctx: Context, close_id: str) -> None:
+    """Post where the close stands and link existing gap threads; never repost a root."""
+    phase, open_gaps = await ctx.core.resume_state(close_id)
+    text = messages.resume_line(
+        messages.month_label(messages.month_of(close_id)), phase, open_gaps, ctx.display, ctx.room.link
+    )
+    await ctx.room.post("carbon-room", text)
+    await gaps.post_new_gaps(ctx, close_id, [])
+
+
+async def handle_resume(ctx: Context, event: RoomEvent, intent: Intent, actor: Actor) -> None:
+    close_id = await ctx.core.latest_close()
+    if close_id is None:
+        await ctx.room.post("carbon-room", messages.no_close(), thread_id=event.thread_id or event.message_id)
+        return
+    await resume(ctx, close_id)
+
+
+async def resume_on_startup(ctx: Context) -> bool:
+    close_id = await ctx.core.latest_close()
+    if close_id is None:
+        return False
+    phase, _ = await ctx.core.resume_state(close_id)
+    if phase == "PUBLISHED":
+        return False
+    ctx.room.begin_close(close_id)
+    await resume(ctx, close_id)
+    return True
