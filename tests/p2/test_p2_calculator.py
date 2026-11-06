@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from carbon_room import core
-from carbon_room.calc import calculator, run
+from carbon_room.calc import calculator, factors, run
 from carbon_room.ledger import ledger
 from carbon_room.models import Claim
 
@@ -118,10 +118,12 @@ def test_the_factor_choice_is_recorded_on_the_claim_and_in_the_audit_log(factor_
     assert ledger.get_claim(factor_db, october["w2"]).factor_version == "2026"
 
 
-def test_data_centre_claims_are_left_alone(factor_db, close_id, october):
-    results = run.calculate(factor_db, close_id)
+def test_data_centre_claims_are_left_alone_but_the_skip_is_announced(factor_db, close_id, october, caplog):
+    with caplog.at_level("WARNING", logger="carbon_room.calc.run"):
+        results = run.calculate(factor_db, close_id)
     assert ledger.latest_calculation(factor_db, october["dc"]) is None
     assert len(results) == 4
+    assert any(october["dc"] in message and "data-centre" in message for message in caplog.messages)
 
 
 def test_running_twice_adds_no_calculations_and_no_events(factor_db, close_id, october):
@@ -133,22 +135,53 @@ def test_running_twice_adds_no_calculations_and_no_events(factor_db, close_id, o
     assert factor_db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == events
 
 
-def test_a_factor_a_human_chose_is_respected_and_the_old_calculation_is_superseded(factor_db, close_id, october):
+EXTRA_DEFRA_2025 = {"factor_id": "DEFRA-2025-UK-electricity_kwh", "source": "DEFRA", "version": "2025", "year": "2025",
+                    "activity": "electricity_kwh", "geography": "UK", "value": "0.20705", "unit": "kgCO2e/kWh",
+                    "citation": "test-only older edition"}
+
+
+def force_factor(db, claim_id, factor_id, version):
+    """Put a factor on a claim with plain SQL, so the test does not depend on whether the ledger guards set_factor."""
+    db.execute("UPDATE claims SET factor_id=?, factor_version=? WHERE claim_id=?", (factor_id, version, claim_id))
+
+
+def test_a_valid_factor_a_human_chose_is_respected_and_the_old_calculation_superseded(factor_db, close_id, october):
+    ledger.load_factors(factor_db, [EXTRA_DEFRA_2025])
     run.calculate(factor_db, close_id)
-    ledger.set_factor(factor_db, october["w2"], "EGRID-2023-CAMX-electricity_kwh", "2023", core_actor(), "test")
+    ledger.set_factor(factor_db, october["w2"], "DEFRA-2025-UK-electricity_kwh", "2025", core_actor(), "test")
     run.calculate(factor_db, close_id)
-    assert ledger.get_claim(factor_db, october["w2"]).factor_id == "EGRID-2023-CAMX-electricity_kwh"
+    assert ledger.get_claim(factor_db, october["w2"]).factor_id == "DEFRA-2025-UK-electricity_kwh"
     rows = factor_db.execute("SELECT COUNT(*) FROM calculations WHERE claim_id=?", (october["w2"],)).fetchone()[0]
     assert rows == 2
-    assert ledger.latest_calculation(factor_db, october["w2"]).kgco2e == D("3510.66614453478")  # 18000 x 0.195037
+    assert ledger.latest_calculation(factor_db, october["w2"]).kgco2e == D("3726.9")  # 18000 x 0.20705
 
 
-def test_a_factor_in_the_wrong_unit_is_refused_not_converted(factor_db, close_id, october):
-    from carbon_room.calc.units import UnsupportedUnit
-
-    ledger.set_factor(factor_db, october["w2"], "DEFRA-2026-UK-diesel_l", "2026", core_actor(), "wrong factor")
-    with pytest.raises(UnsupportedUnit):
+@pytest.mark.parametrize("claim_key, factor_id, version, why", [
+    ("w2", "DEFRA-2026-UK-diesel_l", "2026", "activity"),                          # litres factor on a kWh claim
+    ("w2", "EGRID-2023-CAMX-electricity_kwh", "2023", "source"),                   # US grid on a UK site
+    ("hq_elec", "DEFRA-2026-UK-electricity_kwh", "2026", "source"),                # UK grid on a US site
+    ("diesel", "DEFRA-2026-UK-electricity_kwh", "2026", "activity"),               # electricity factor on diesel
+])
+def test_a_factor_outside_the_sites_prescribed_source_or_activity_is_refused(
+        factor_db, close_id, october, claim_key, factor_id, version, why):
+    force_factor(factor_db, october[claim_key], factor_id, version)
+    with pytest.raises(factors.FactorNotAllowed, match=why):
         run.calculate(factor_db, close_id)
+
+
+def test_an_older_edition_of_the_prescribed_source_is_allowed_so_the_stale_rule_can_judge_it(factor_db, close_id,
+                                                                                         october):
+    ledger.load_factors(factor_db, [EXTRA_DEFRA_2025])
+    force_factor(factor_db, october["w2"], "DEFRA-2025-UK-electricity_kwh", "2025")
+    run.calculate(factor_db, close_id)  # must not raise; deciding it is stale is the Watchdog's job
+
+
+def test_ensure_allowed_names_the_site_and_what_was_expected(factor_db):
+    wrong = ledger.get_factor(factor_db, "EGRID-2023-CAMX-electricity_kwh")
+    with pytest.raises(factors.FactorNotAllowed) as error:
+        factors.ensure_allowed("warehouse-2", "electricity_kwh", wrong)
+    assert "warehouse-2" in str(error.value) and "DEFRA" in str(error.value) and "UK" in str(error.value)
+    factors.ensure_allowed("hq", "electricity_kwh", wrong)  # the right one passes silently
 
 
 def core_actor():
