@@ -1,0 +1,48 @@
+# Carbon Room settings owned by P2 (contract section 9). Every key says which code reads it.
+
+# core.start_close() rejects any factor set that is not listed here, then locks the chosen one on the close.
+# calc.factors.locked_factor() reads the version for each source (DEFRA, EGRID, EMBER) from the locked set.
+# EGRID is "2023" because eGRID2023 (Rev 2, June 2025) is the newest edition EPA has published; there is no eGRID2024.
+factor_sets:
+  FS-2026-10: { DEFRA: "2026", EGRID: "2023", EMBER: "2025" }
+default_factor_set: FS-2026-10
+
+# checks.rules.*
+rules:
+  variance_threshold: 0.10      # R5: month-over-month change at or above this needs a human
+  conflict_tolerance: 0.005     # R2: relative difference between two claims for one site, month and activity
+  period_min_overlap: 0.5       # R4: share of a bill's period that must fall inside the claimed month
+
+# checks.tiers, checks.resolve, report.publish
+approvals:
+  default_owner: lead           # owner of findings that belong to no particular site (R2, R3, R5, R6)
+  approve_roles: [lead, finance]
+  publish_roles: [lead]
+  tier1: { same_factor_version: true, max_variance: 0.10 }
+
+# ledger.budget (P1) and the room's budget notices (P3)
+budgets:
+  default_tokens: 200000
+  warn_at: 0.8
+
+# P1's collect._mode() reads llm.mode. "rules" is the deterministic offline extractor. Switch to "replay" only
+# once data/cache/extractions/ is populated, otherwise ingestion fails on a cache miss.
+llm:
+  provider: anthropic
+  model: claude-sonnet-5-5
+  temperature: 0
+  mode: rules
+
+# P3's noise guard
+noise:
+  max_top_level_posts: 12
+
+# report.summary
+datacentre:
+  show_market: true
+  ai_line_policy: UNVERIFIED
+
+# report.reporter: categories listed as "no data", never as zero
+scope3:
+  computed: []
+  listed_as_no_data: ["Cat 1 Purchased goods and services", "Cat 6 Business travel"]
