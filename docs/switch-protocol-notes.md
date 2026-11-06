@@ -42,4 +42,17 @@ edited only by it. Plan §1.5 has the documented facts; spikes are in docs/spike
 _Not written yet._
 
 ## S09 register
-_Not written yet._
+- Registration: `POST {server}/agents` with `Bearer <registration key>` and `{name, description, connector_type:
+  "carbon-room-python", display_name, integration_profile{connection_model: "always_on", message_exchange: true,
+  pre/post_invocation_mediation: [], event_reporting: []}}`. A 200 or 201 returns `{id, api_key}`; the key is
+  shown once, so both are written to `.env` at once and never printed.
+- 409 means the name is taken: print the hint and continue. Other statuses print `detail` or 200 chars of body.
+- Console import (`--from-console DIR`): `DIR/<name>.json` holds `{"env": {SWITCH_API_ENDPOINT, SWITCH_API_TOKEN,
+  SWITCH_AGENT_ID}}`. Id and token become the agent's id and key; the endpoint fills `SWITCH_SERVER` if unset.
+  This mode never calls `POST /agents`.
+- Addressing: `POST /agents/{id}/ops/update_agent_detail {"agent_id", "addressing": "anyone"}` with the agent's
+  own key and no connection id. A 400 or 403 prints the Switch Console fallback and never changes the exit code.
+- Invite: `GET /agents/{carbon-room id}/ops`, read `invite_agent_to_room.input_schema.properties`. The first
+  property containing `room` is the room argument; the first containing `agent` is the agent argument. If that
+  name contains `id` send the Switch id, otherwise the agent name. On any failure print the by-hand hint.
+- All of this follows the docs only. Real behaviour (addressing, invite schema) is confirmed in M2.
