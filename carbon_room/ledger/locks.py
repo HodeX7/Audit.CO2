@@ -10,7 +10,6 @@ from typing import Iterator
 from carbon_room.ledger.audit import append_event
 from carbon_room.models import LockHeld
 
-
 _LEASE_TTL = timedelta(minutes=5)
 
 
@@ -34,8 +33,9 @@ def _is_fresh(row: sqlite3.Row, now: datetime) -> bool:
     return acquired > now - _LEASE_TTL
 
 
-def _active_holder(conn: sqlite3.Connection, close_id: str, site: str, month: str,
-                   source_doc_id: str, now: datetime) -> str | None:
+def _active_holder(
+    conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str, now: datetime
+) -> str | None:
     row = _row(conn, close_id, site, month, source_doc_id)
     return str(row["holder"]) if row is not None and _is_fresh(row, now) else None
 
@@ -60,8 +60,7 @@ def _is_busy(error: sqlite3.OperationalError) -> bool:
     return "locked" in message or "busy" in message
 
 
-def _contention(conn: sqlite3.Connection, close_id: str, site: str, month: str,
-                source_doc_id: str) -> LockHeld:
+def _contention(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str) -> LockHeld:
     """Return a retryable lock error, naming the committed holder when visible."""
     try:
         holder = _active_holder(conn, close_id, site, month, source_doc_id, _now())
@@ -70,8 +69,7 @@ def _contention(conn: sqlite3.Connection, close_id: str, site: str, month: str,
     return LockHeld(holder or "another worker")
 
 
-def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str,
-             holder: str) -> None:
+def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str, holder: str) -> None:
     """Commit the work and removal of the published lease together."""
     if not conn.in_transaction:
         conn.execute("BEGIN IMMEDIATE")
@@ -88,8 +86,9 @@ def _release(conn: sqlite3.Connection, close_id: str, site: str, month: str, sou
 
 
 @contextmanager
-def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str,
-               holder: str) -> Iterator[None]:
+def claim_lock(
+    conn: sqlite3.Connection, close_id: str, site: str, month: str, source_doc_id: str, holder: str
+) -> Iterator[None]:
     """Publish a five-minute lease for one content key and release it on exit.
 
     A lease is intentionally committed before yielding.  That makes it visible
@@ -118,8 +117,13 @@ def claim_lock(conn: sqlite3.Connection, close_id: str, site: str, month: str, s
                  holder=excluded.holder, acquired_at=excluded.acquired_at
                WHERE locks.acquired_at <= ?""",
             (
-                close_id, site, month, source_doc_id, holder,
-                now.isoformat().replace("+00:00", "Z"), expires_at,
+                close_id,
+                site,
+                month,
+                source_doc_id,
+                holder,
+                now.isoformat().replace("+00:00", "Z"),
+                expires_at,
             ),
         )
         if cursor.rowcount == 0:

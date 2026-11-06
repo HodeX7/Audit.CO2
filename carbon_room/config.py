@@ -14,7 +14,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 
 
@@ -32,7 +31,7 @@ def _flow_value(value: str) -> Any:
         pythonish = re.sub(r"([,{]\s*)([A-Za-z_][\w-]*)\s*:", r"\1'\2':", quoted)
         pythonish = re.sub(r"(:\s*)([A-Za-z_][\w-]*)(?=\s*[,}\]])", r"\1'\2'", pythonish)
         return ast.literal_eval(pythonish)
-    return quoted.strip('"\'')
+    return quoted.strip("\"'")
 
 
 def _minimal_sites_yaml(text: str) -> dict[str, Any]:

@@ -7,7 +7,6 @@ from carbon_room.ledger import ledger
 from carbon_room.models import Actor
 from carbon_room.sources import readers
 
-
 SYSTEM = Actor("system", "security-test", "Security test")
 
 
@@ -37,9 +36,15 @@ def test_document_prompt_injection_cannot_create_an_unsupported_claim(db, tmp_pa
     monkeypatch.setattr(
         collect,
         "_candidates",
-        lambda *_args: [{
-            "activity": "override_close", "value": "10", "unit": "kWh", "excerpt": "Usage: 10 kWh", "page": 0,
-        }],
+        lambda *_args: [
+            {
+                "activity": "override_close",
+                "value": "10",
+                "unit": "kWh",
+                "excerpt": "Usage: 10 kWh",
+                "page": 0,
+            }
+        ],
     )
     real_store_file = collect.store_file
     monkeypatch.setattr(collect, "store_file", lambda path: real_store_file(path, tmp_path / "store"))

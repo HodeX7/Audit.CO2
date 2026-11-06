@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from carbon_room import config
-from carbon_room.ledger import connect
-from carbon_room.ledger import budget, ledger
+from carbon_room.ledger import budget, connect, ledger
 from carbon_room.ledger.audit import verify_audit as verify_chain
-from carbon_room.models import Actor
+
 
 def _unimplemented(owner: str, story: str) -> None:
     raise NotImplementedError(f"owner: {owner}, story {story}")
@@ -47,7 +46,12 @@ def ingest_file(close_id, path, actor, chat_message_id, site=None):
         raise NeedsRoomEvent("human uploads require a Switch chat_message_id")
     with connect() as db:
         return collect.ingest_file(
-            db, close_id, path, actor, site=site, month_from_period=True,
+            db,
+            close_id,
+            path,
+            actor,
+            site=site,
+            month_from_period=True,
             chat_message_id=chat_message_id,
         )
 

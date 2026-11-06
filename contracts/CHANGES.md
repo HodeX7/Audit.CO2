@@ -2,6 +2,18 @@
 
 The active contract implementation lives in `carbon_room/`.
 
+## 2026-11-06 — P2 calculation-read handoff
+
+- `ledger.latest_calculation(conn, claim_id, basis=...)` is now a public basis-filtered read. The permitted basis
+  values are `"location"`, `"market"`, and legacy `None`; invalid values are rejected.
+- `ledger.live_calculations(conn, claim_id)` returns every non-superseded calculation for a claim. When no basis is
+  provided, `latest_calculation` prefers location, then legacy basisless, then market records to prevent a legacy
+  caller from silently treating a market result as the location result.
+- Calculations retain one live row per claim and basis. This confirms the existing write rule: a newer location
+  calculation supersedes only location, and a newer market calculation supersedes only market.
+- No SQLite migration is required: the existing `basis`, `created_at`, and `superseded_by` columns already express
+  this contract.
+
 ## 2026-11-05 — P1 integrity hardening
 
 - Fresh ledgers enforce the published close-phase and claim-status literals with SQLite checks.

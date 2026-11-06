@@ -46,14 +46,20 @@ def _settings() -> tuple[str, float, float]:
     return model, temperature, timeout_seconds
 
 
-def complete_json(task: str, system: str, user: Any, agent: str, close_id: str,
-                  *, conn: sqlite3.Connection | None = None) -> dict:
+def complete_json(
+    task: str, system: str, user: Any, agent: str, close_id: str, *, conn: sqlite3.Connection | None = None
+) -> dict:
     """Request JSON through the configured provider and charge the active ledger once."""
     model, temperature, timeout_seconds = _settings()
     if _completion_provider is not None:
         decoded, tokens = _completion_provider(
-            task=task, system=system, user=user, model=model, temperature=temperature,
-            max_tokens=2048, timeout_seconds=timeout_seconds,
+            task=task,
+            system=system,
+            user=user,
+            model=model,
+            temperature=temperature,
+            max_tokens=2048,
+            timeout_seconds=timeout_seconds,
         )
         if not isinstance(decoded, dict):
             raise ValueError(f"model returned a non-object JSON response for task {task!r}")
@@ -68,8 +74,13 @@ def complete_json(task: str, system: str, user: Any, agent: str, close_id: str,
             raise RuntimeError("install project dependencies to use live model extraction") from exc
         client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=timeout_seconds)
     for attempt in range(2):
-        response = client.messages.create(model=model, temperature=temperature, max_tokens=2048, system=system,
-                                          messages=[{"role": "user", "content": json.dumps(user, default=str)}])
+        response = client.messages.create(
+            model=model,
+            temperature=temperature,
+            max_tokens=2048,
+            system=system,
+            messages=[{"role": "user", "content": json.dumps(user, default=str)}],
+        )
         try:
             text = response.content[0].text
         except (AttributeError, IndexError, TypeError) as exc:
@@ -99,8 +110,16 @@ def _charge(conn: sqlite3.Connection | None, close_id: str, agent: str, tokens: 
         budget.charge(db, close_id, agent, tokens)
 
 
-def phrase(question: str, facts: list[str], agent: str, close_id: str, *, scope: str = "this close",
-           reason: str = "no VERIFIED ledger rows match", owner: str = "lead") -> str:
+def phrase(
+    question: str,
+    facts: list[str],
+    agent: str,
+    close_id: str,
+    *,
+    scope: str = "this close",
+    reason: str = "no VERIFIED ledger rows match",
+    owner: str = "lead",
+) -> str:
     """Never invoke a model when the truth set is empty."""
     if not facts:
         return f"UNKNOWN for {scope}, because {reason}, owned by {owner}"

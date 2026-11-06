@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-
 DEFAULT_PATH = Path("var/carbon_room.db")
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 

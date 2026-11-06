@@ -7,7 +7,16 @@ Owner: Ujjwal. Package: `carbon_room`.
 - SQLite is the authoritative ledger; quantities are stored as exact Decimal-compatible text.
 - Source bytes are content-addressed and each source SHA-256 is unique within a close.
 - Newly ingested claims are always `UNVERIFIED`.
+- A parsed billing period determines a claim's month, including prior-period evidence collected for comparison.
+- Diesel activity is recorded as Scope 1; electricity as Scope 2; cloud data-centre activity as `DC`.
+- Missing, malformed, or reversed billing periods are retained as failed sources and create no claim.
+- A claim must reference a successfully extracted source using its stored SHA-256, a verbatim excerpt containing its
+  value, and the activity's required unit and scope. A selected factor must match the claim activity.
+- Location-based and market-based calculations for a claim coexist; only a newer calculation with the same basis
+  supersedes its predecessor.
 - Audit events are hash chained and append-only.
+- Standalone audit writes reserve a SQLite writer transaction before selecting their predecessor hash; sequential P1
+  identifiers use the same reservation so concurrent writers cannot reuse an ID.
 - Human uploads and every human-facing P1 ledger mutation require a real Switch `chat_message_id`; human actors
   cannot advance a close phase directly.
 - Only the Watchdog/system identity can mark a claim `VERIFIED`.
@@ -22,6 +31,10 @@ Use `carbon_room.core` rather than reaching into P1 implementation modules:
 - P3 calls `ingest_file(close_id, path, actor, chat_message_id, site)` for an uploaded attachment.
 - P3 uses `gap_for_thread`, `record_gap_thread`, and `resume_state` to restore room state.
 - P2 uses `ledger` operations and contract dataclasses from `carbon_room.models`.
+- P2 reads one accounting method with `ledger.latest_calculation(conn, claim_id, basis="location"|"market")`
+  and reads both live methods with `ledger.live_calculations(conn, claim_id)`. With no `basis`,
+  `latest_calculation` safely prefers location, then legacy basisless, then market values; P2 must pass a basis for
+  any customer-facing number.
 - P2/P3 must preserve `chat_message_id` when recording human actions.
 - Before P3 starts a close, P2 must provide `config/carbon_room.yaml` with the allowed `factor_sets`; P1 rejects an
   unknown or unavailable factor set and records the selected one as `factor_set_locked`.
@@ -50,7 +63,24 @@ ID instead of overwriting a row referenced by a locked close; P1 rejects a chang
 close-scoped audit chain cannot represent
 global factor-catalog bootstrap without a team-approved catalog-audit design.
 
+## Calculation contract for P2
+
+The authoritative `calculations` row and `Calculation` dataclass fields are: `calc_id`, `claim_id`, `factor_id`,
+`factor_version`, `activity_value`, `activity_unit`, `factor_value`, `factor_unit`, `kgco2e`, `formula`, and `basis`.
+Quantities are `Decimal` values in Python and Decimal-compatible text in SQLite. `basis` is exactly `"location"`,
+`"market"`, or `None` only for legacy records. `superseded_by` and `created_at` are ledger-managed fields, not P2
+inputs. A calculation references one claim and one immutable factor; P2 must use a factor whose activity, unit,
+geography, and version are valid for that claim and the close's locked factor set.
+
+For a data-centre `dc_it_kwh` claim, P2 may write both a location and a market calculation. Each must retain its own
+factor, formula, and basis; writing a replacement supersedes only the prior live calculation with that same basis.
+P1 does not infer PUE, allocation, renewable instruments, or which data-centre basis is reportable—those are P2
+calculation-policy decisions and must be expressed in the stored factor/formula.
+
 ## Verification before integration
+
+`EXPECTED.md` is the deterministic P1 seed-ingestion acceptance baseline (nine claims, source-period assignment,
+scope classification, idempotency, and audit verification).
 
 ```bash
 uv run pytest

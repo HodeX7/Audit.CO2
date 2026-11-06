@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from carbon_room.agents import Collector
 from carbon_room import core
+from carbon_room.agents import Collector
 from carbon_room.models import Actor
 
 

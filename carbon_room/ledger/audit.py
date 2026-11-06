@@ -38,28 +38,56 @@ def actor_id(actor: Actor | str) -> str:
 
 
 def append_event(
-    conn: sqlite3.Connection, close_id: str, actor: Actor | str, kind: str, *, claim_id: str | None = None,
-    before: str | None = None, after: str | None = None, chat_message_id: str | None = None, reason: str = "",
+    conn: sqlite3.Connection,
+    close_id: str,
+    actor: Actor | str,
+    kind: str,
+    *,
+    claim_id: str | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    chat_message_id: str | None = None,
+    reason: str = "",
     payload: dict[str, Any] | None = None,
 ) -> int:
     """Append exactly one event and return its auto-incremented identifier."""
-    previous = conn.execute(
-        "SELECT hash FROM events WHERE close_id = ? ORDER BY event_id DESC LIMIT 1", (close_id,)
-    ).fetchone()
-    prev_hash = previous["hash"] if previous else ZERO_HASH
-    event = {
-        "close_id": close_id, "actor": actor_id(actor), "kind": kind, "claim_id": claim_id,
-        "before_status": before, "after_status": after, "chat_message_id": chat_message_id,
-        "timestamp": _timestamp(), "reason": reason, "payload": payload or {}, "prev_hash": prev_hash,
-    }
-    digest = hashlib.sha256((prev_hash + canonical(event)).encode("utf-8")).hexdigest()
-    cursor = conn.execute(
-        """INSERT INTO events(close_id,actor,kind,claim_id,before_status,after_status,chat_message_id,timestamp,
-                              reason,payload,prev_hash,hash) VALUES (:close_id,:actor,:kind,:claim_id,:before_status,
-                              :after_status,:chat_message_id,:timestamp,:reason,:payload,:prev_hash,:hash)""",
-        {**event, "payload": canonical(event["payload"]), "hash": digest},
-    )
-    return int(cursor.lastrowid)
+    owns_transaction = not conn.in_transaction
+    if owns_transaction:
+        # The predecessor read and insert must share SQLite's writer reservation.
+        # Otherwise two standalone writers can both hash against the same event.
+        conn.execute("BEGIN IMMEDIATE")
+    try:
+        previous = conn.execute(
+            "SELECT hash FROM events WHERE close_id = ? ORDER BY event_id DESC LIMIT 1", (close_id,)
+        ).fetchone()
+        prev_hash = previous["hash"] if previous else ZERO_HASH
+        event = {
+            "close_id": close_id,
+            "actor": actor_id(actor),
+            "kind": kind,
+            "claim_id": claim_id,
+            "before_status": before,
+            "after_status": after,
+            "chat_message_id": chat_message_id,
+            "timestamp": _timestamp(),
+            "reason": reason,
+            "payload": payload or {},
+            "prev_hash": prev_hash,
+        }
+        digest = hashlib.sha256((prev_hash + canonical(event)).encode("utf-8")).hexdigest()
+        cursor = conn.execute(
+            "INSERT INTO events(close_id,actor,kind,claim_id,before_status,after_status,chat_message_id,timestamp,"
+            "reason,payload,prev_hash,hash) VALUES (:close_id,:actor,:kind,:claim_id,:before_status,"
+            ":after_status,:chat_message_id,:timestamp,:reason,:payload,:prev_hash,:hash)",
+            {**event, "payload": canonical(event["payload"]), "hash": digest},
+        )
+        if owns_transaction:
+            conn.commit()
+        return int(cursor.lastrowid)
+    except Exception:
+        if owns_transaction and conn.in_transaction:
+            conn.rollback()
+        raise
 
 
 def _timestamp() -> str:
@@ -76,10 +104,16 @@ def verify_audit(conn: sqlite3.Connection, close_id: str) -> AuditCheck:
     for row in rows:
         count += 1
         event = {
-            "close_id": row["close_id"], "actor": row["actor"], "kind": row["kind"],
-            "claim_id": row["claim_id"], "before_status": row["before_status"],
-            "after_status": row["after_status"], "chat_message_id": row["chat_message_id"],
-            "timestamp": row["timestamp"], "reason": row["reason"], "payload": json.loads(row["payload"]),
+            "close_id": row["close_id"],
+            "actor": row["actor"],
+            "kind": row["kind"],
+            "claim_id": row["claim_id"],
+            "before_status": row["before_status"],
+            "after_status": row["after_status"],
+            "chat_message_id": row["chat_message_id"],
+            "timestamp": row["timestamp"],
+            "reason": row["reason"],
+            "payload": json.loads(row["payload"]),
             "prev_hash": previous,
         }
         expected = hashlib.sha256((previous + canonical(event)).encode("utf-8")).hexdigest()
