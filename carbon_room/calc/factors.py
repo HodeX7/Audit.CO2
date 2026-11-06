@@ -106,3 +106,28 @@ def factor_from_ref(conn, ref: str) -> dict | None:
 def is_locked(close: dict, factor: dict) -> bool:
     """True when ``factor`` is the version its source is pinned to in the close's locked set."""
     return locked_version(close, factor["source"]) == factor["version"]
+
+
+def _months_since_year_end(year: str, month: str) -> int:
+    return int(month[:4]) * 12 + int(month[5:]) - (int(year) * 12 + 12)
+
+
+def is_stale(close: dict, factor: dict) -> tuple[bool, str | None]:
+    """Decide whether a factor is stale for a close, and say why.
+
+    Stale when it is not the edition the locked set pins, or when it is older than ``stale_max_age_months`` and a newer
+    edition has been published. The newest published edition is never flagged for age, so eGRID2023 stays valid
+    while EPA has released nothing later.
+    """
+    source, version = factor["source"], factor["version"]
+    pinned = locked_version(close, source)
+    if pinned is None:
+        return True, f"{source} {version} is not in the locked set {close['factor_set']}"
+    if pinned != version:
+        return True, f"{source} {version} is not the locked {source} {pinned}"
+    limit = int(config.load_config()["rules"]["stale_max_age_months"])
+    latest = config.load_config().get("latest_published", {}).get(source)
+    if _months_since_year_end(factor["year"], close["month"]) > limit and version != str(latest):
+        return True, (f"{source} {version} is older than {limit} months and {source} {latest} "
+                      "is the latest published edition")
+    return False, None

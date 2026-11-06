@@ -7,11 +7,17 @@ factor_sets:
   FS-2026-10: { DEFRA: "2026", EGRID: "2023", EMBER: "2025" }
 default_factor_set: FS-2026-10
 
+# calc.factors.is_stale(): the newest edition each publisher has released, so the age rule never flags it.
+# Checked on 5 Nov 2026 (EPA lists only eGRID2023; DESNZ 2026 published 11 June 2026; Ember 2025 full year).
+# Update this when a newer edition appears and add its row to factors.csv.
+latest_published: { DEFRA: "2026", EGRID: "2023", EMBER: "2025" }
+
 # checks.rules.*
 rules:
   variance_threshold: 0.10      # R5: month-over-month change at or above this needs a human
   conflict_tolerance: 0.005     # R2: relative difference between two claims for one site, month and activity
   period_min_overlap: 0.5       # R4: share of a bill's period that must fall inside the claimed month
+  stale_max_age_months: 12      # R3: a factor older than this is stale, unless it is the latest published edition
 
 # checks.tiers, checks.resolve, report.publish
 approvals:
