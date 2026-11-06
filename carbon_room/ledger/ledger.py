@@ -216,8 +216,15 @@ def supersede(conn, old_claim_id, new_claim_id, actor, reason, chat_message_id) 
                  chat_message_id=chat_message_id, reason=reason, payload={"superseded_by": new_claim_id})
 
 
+_CALC_BASES = {None, "location", "market"}
+_ANY_BASIS = object()
+
+
 def add_calculation(conn, calc: Calculation) -> str:
-    claim = get_claim(conn, calc.claim_id); previous = latest_calculation(conn, calc.claim_id)
+    """Record a calculation; it supersedes only the earlier live calculation with the same basis."""
+    if calc.basis not in _CALC_BASES:
+        raise ValueError(f"calculation basis must be 'location', 'market' or None, not {calc.basis!r}")
+    claim = get_claim(conn, calc.claim_id); previous = latest_calculation(conn, calc.claim_id, calc.basis)
     calc_id = calc.calc_id or next_id(conn, "CA")
     values = asdict(calc) | {"calc_id": calc_id, "activity_value": str(calc.activity_value), "factor_value": str(calc.factor_value),
                               "kgco2e": str(calc.kgco2e), "created_at": _now(), "superseded_by": None}
@@ -229,9 +236,25 @@ def add_calculation(conn, calc: Calculation) -> str:
     return calc_id
 
 
-def latest_calculation(conn, claim_id):
-    row = conn.execute("SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL ORDER BY created_at DESC, calc_id DESC LIMIT 1", (claim_id,)).fetchone()
+def latest_calculation(conn, claim_id, basis=_ANY_BASIS):
+    """Return a claim's live calculation, optionally for one basis.
+
+    With no basis, a location-based (or basisless) record is preferred over a market-based one, so callers written
+    before per-basis records never silently receive the market figure.
+    """
+    sql, params = "SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL", [claim_id]
+    if basis is not _ANY_BASIS:
+        sql += " AND basis IS ?"; params.append(basis)
+    sql += " ORDER BY COALESCE(basis, '') = 'market', created_at DESC, calc_id DESC LIMIT 1"
+    row = conn.execute(sql, params).fetchone()
     return _calc(row) if row else None
+
+
+def live_calculations(conn, claim_id):
+    """Return every live calculation of a claim, one per basis."""
+    rows = conn.execute("SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL ORDER BY calc_id",
+                        (claim_id,))
+    return [_calc(row) for row in rows]
 
 
 def upsert_gap(conn, close_id, finding: Finding):

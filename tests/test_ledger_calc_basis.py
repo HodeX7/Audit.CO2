@@ -15,8 +15,9 @@ D = Decimal
 
 @pytest.fixture
 def claim_id(db):
-    ledger.load_factors(db, [{"factor_id": "F-1", "source": "S", "version": "1", "year": "2026", "activity": "dc_it_kwh",
-                              "geography": "IE", "value": "0.5", "unit": "kgCO2e/kWh", "citation": "test"}])
+    ledger.load_factors(db, [{"factor_id": "F-1", "source": "S", "version": "1", "year": "2026",
+                              "activity": "dc_it_kwh", "geography": "IE", "value": "0.5", "unit": "kgCO2e/kWh",
+                              "citation": "test"}])
     close = ledger.create_close(db, "2026-10", ["dc-eu-west"], "FS-test", SYSTEM, "msg")
     ledger.add_source(db, Source("SRC-1", close, "dc-eu-west", "cloud_invoice", "f.json", "p", "sha", 1, "t", None, None,
                                  "OK", None), SYSTEM)
@@ -26,7 +27,8 @@ def claim_id(db):
 
 
 def calc(claim_id, kg, basis, formula="f"):
-    return Calculation("", claim_id, "F-1", "1", D("12000"), "kWh", D("0.5"), "kgCO2e/kWh", D(kg), formula, basis)
+    return Calculation("", claim_id, "F-1", "1", D("12000"), "kWh", D("0.5"), "kgCO2e/kWh", D(kg), formula,
+                       basis)
 
 
 def live_count(db, claim_id):
