@@ -1,4 +1,5 @@
 """SPEC-02: grammar parser tests."""
+# ruff: noqa: E501
 
 from __future__ import annotations
 
