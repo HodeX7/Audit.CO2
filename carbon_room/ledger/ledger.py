@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -35,6 +36,7 @@ _CLOSE_PHASES = {
     "PUBLISHED",
 }
 _ACTIVITY_UNITS = {"electricity_kwh": "kWh", "diesel_l": "L", "dc_it_kwh": "kWh"}
+_ACTIVITY_SCOPES = {"electricity_kwh": "2", "diesel_l": "1", "dc_it_kwh": "DC"}
 
 
 def _now() -> str:
@@ -43,6 +45,10 @@ def _now() -> str:
 
 def _json(value: Any) -> str:
     return json.dumps(value, default=str, sort_keys=True, separators=(",", ":"))
+
+
+def _normalise_text(value: str) -> str:
+    return " ".join(value.split())
 
 
 def _human_message(actor: Actor, message_id: str | None) -> None:
@@ -95,6 +101,10 @@ def create_close(conn, month, sites, factor_set, actor, chat_message_id) -> str:
     _human_message(actor, chat_message_id)
     if len(month) != 7 or month[4] != "-":
         raise ValueError("month must use YYYY-MM")
+    try:
+        datetime.strptime(month, "%Y-%m")
+    except ValueError as error:
+        raise ValueError("month must be a valid calendar month") from error
     version = int(
         conn.execute("SELECT COALESCE(MAX(version), 0) + 1 FROM closes WHERE month = ?", (month,)).fetchone()[0]
     )
@@ -171,15 +181,27 @@ def add_claim(conn, claim, actor, chat_message_id: str | None = None) -> str:
         raise ValueError(f"unsupported claim activity: {claim.activity!r}")
     if claim.unit != expected_unit:
         raise ValueError(f"claim unit for {claim.activity} must be {expected_unit}")
+    if claim.scope != _ACTIVITY_SCOPES[claim.activity]:
+        raise ValueError(f"claim scope for {claim.activity} must be {_ACTIVITY_SCOPES[claim.activity]}")
     try:
         claim_value = Decimal(str(claim.value))
     except InvalidOperation as error:
         raise ValueError("claim value must be decimal") from error
     if not claim_value.is_finite() or claim_value <= 0:
         raise ValueError("claim value must be a positive finite decimal")
-    source = conn.execute("SELECT close_id FROM sources WHERE source_doc_id = ?", (claim.source_doc_id,)).fetchone()
+    source = conn.execute("SELECT * FROM sources WHERE source_doc_id = ?", (claim.source_doc_id,)).fetchone()
     if source is None or source["close_id"] != claim.close_id:
         raise ValueError("claim source must belong to the same close")
+    if source["extract_status"] != "OK":
+        raise ValueError("claim source must have successful extraction")
+    if claim.source_sha256 != source["sha256"]:
+        raise ValueError("claim source SHA-256 must match the stored source")
+    excerpt = _normalise_text(claim.source_excerpt)
+    if not excerpt or excerpt not in _normalise_text(source["raw_text"]):
+        raise ValueError("claim excerpt is not verbatim source text")
+    excerpt_values = [Decimal(item.replace(",", "")) for item in re.findall(r"\d[\d,]*(?:\.\d+)?", excerpt)]
+    if claim_value not in excerpt_values:
+        raise ValueError("claim value is absent from its source excerpt")
     claim_id = claim.claim_id or next_id(conn, "CL")
     values = asdict(claim) | {
         "claim_id": claim_id,
@@ -251,6 +273,8 @@ def set_factor(conn, claim_id, factor_id, factor_version, actor, reason, chat_me
     factor = get_factor(conn, factor_id)
     if factor["version"] != factor_version:
         raise ValueError(f"factor version mismatch for {factor_id!r}")
+    if factor["activity"] != claim.activity:
+        raise ValueError(f"factor activity {factor['activity']!r} does not match claim activity {claim.activity!r}")
     conn.execute(
         "UPDATE claims SET factor_id = ?, factor_version = ? WHERE claim_id = ?", (factor_id, factor_version, claim_id)
     )
@@ -269,6 +293,13 @@ def set_factor(conn, claim_id, factor_id, factor_version, actor, reason, chat_me
 def supersede(conn, old_claim_id, new_claim_id, actor, reason, chat_message_id) -> None:
     _human_message(actor, chat_message_id)
     old = get_claim(conn, old_claim_id)
+    new = get_claim(conn, new_claim_id)
+    if old.claim_id == new.claim_id:
+        raise ValueError("a claim cannot supersede itself")
+    if old.close_id != new.close_id:
+        raise ValueError("replacement claim must belong to the same close")
+    if old.superseded_by is not None:
+        raise ValueError(f"claim {old_claim_id} is already superseded")
     conn.execute("UPDATE claims SET superseded_by = ? WHERE claim_id = ?", (new_claim_id, old_claim_id))
     append_event(
         conn,
@@ -285,7 +316,7 @@ def supersede(conn, old_claim_id, new_claim_id, actor, reason, chat_message_id) 
 
 def add_calculation(conn, calc: Calculation) -> str:
     claim = get_claim(conn, calc.claim_id)
-    previous = latest_calculation(conn, calc.claim_id)
+    previous = _latest_calculation_for_basis(conn, calc.claim_id, calc.basis)
     calc_id = calc.calc_id or next_id(conn, "CA")
     values = asdict(calc) | {
         "calc_id": calc_id,
@@ -311,6 +342,16 @@ def latest_calculation(conn, claim_id):
         "SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL "
         "ORDER BY created_at DESC, calc_id DESC LIMIT 1",
         (claim_id,),
+    ).fetchone()
+    return _calc(row) if row else None
+
+
+def _latest_calculation_for_basis(conn, claim_id, basis):
+    """Return the current calculation for one accounting basis, including NULL basis."""
+    row = conn.execute(
+        "SELECT * FROM calculations WHERE claim_id = ? AND basis IS ? AND superseded_by IS NULL "
+        "ORDER BY created_at DESC, calc_id DESC LIMIT 1",
+        (claim_id, basis),
     ).fetchone()
     return _calc(row) if row else None
 

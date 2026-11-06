@@ -115,6 +115,30 @@ def test_ingestion_can_identify_a_site_from_the_document_text(db, tmp_path):
     close_id = ledger.create_close(db, "2026-10", ["warehouse-2"], "FS-test", SYSTEM, "msg")
     db.commit()
     source_path = tmp_path / "invoice.txt"
-    source_path.write_text("Warehouse-2 utility invoice\nUsage: 10 kWh", encoding="utf-8")
+    source_path.write_text(
+        "Warehouse-2 utility invoice\nBilling period: 1 Oct 2026 – 31 Oct 2026\nUsage: 10 kWh", encoding="utf-8"
+    )
     claim_ids = collect.ingest_file(db, close_id, source_path, SYSTEM)
     assert ledger.get_claim(db, claim_ids[0]).site == "warehouse-2"
+
+
+@pytest.mark.parametrize(
+    ("period", "reason"),
+    [
+        ("Billing period: 31 Sep 2026 – 30 Sep 2026", "invalid billing period"),
+        ("Invoice: no billing dates supplied", "billing period is required"),
+    ],
+)
+def test_invalid_or_missing_billing_period_is_retained_but_creates_no_claim(db, tmp_path, monkeypatch, period, reason):
+    close_id = ledger.create_close(db, "2026-10", ["warehouse-2"], "FS-test", SYSTEM, "msg")
+    db.commit()
+    source_path = tmp_path / "invoice.txt"
+    source_path.write_text(f"Warehouse-2 utility invoice\n{period}\nUsage: 10 kWh", encoding="utf-8")
+    monkeypatch.setattr(collect, "store_file", lambda path: (str(path), f"sha-{reason}"))
+
+    assert collect.ingest_file(db, close_id, source_path, SYSTEM, site="warehouse-2") == []
+
+    source = ledger.get_sources(db, close_id)[0]
+    assert source.extract_status == "FAILED"
+    assert source.extract_error.startswith(reason)
+    assert ledger.get_claims(db, close_id) == []

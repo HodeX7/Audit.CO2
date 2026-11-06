@@ -8,6 +8,8 @@ implemented and tested. P2 and P3 integrate through `carbon_room.core` and the f
 
 The P1 acceptance baseline in `EXPECTED.md` documents the nine-claim seed run. It preserves evidence billing
 months (including comparison-period inputs), classifies diesel as Scope 1, and requires an intact audit chain.
+The ledger additionally rejects fabricated source evidence, invalid calendar periods, cross-close claim replacement,
+and activity-incompatible factor assignment; concurrency tests cover audit appends and identifier allocation.
 
 The P1 test suite also contains a separate, offline, cited corpus of fictional UK and Ireland activities in
 `tests/fixtures/emissions_reference/`. It verifies reader and ledger behavior without loading those references into

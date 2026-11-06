@@ -20,7 +20,7 @@ def test_every_p1_human_ledger_mutation_needs_a_room_message(db):
         "var/store/bill.pdf",
         "hash",
         1,
-        "text",
+        "1 kWh",
         None,
         None,
         "OK",

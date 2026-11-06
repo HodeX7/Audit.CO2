@@ -40,7 +40,7 @@ def extract(path: str | Path) -> dict:
         "activity": "dc_it_kwh",
         "value": value,
         "unit": "kWh",
-        "excerpt": json.dumps({"it_energy_kwh": payload["it_energy_kwh"]}, separators=(",", ":")),
+        "excerpt": f'"it_energy_kwh": {json.dumps(payload["it_energy_kwh"])}',
         "page": 0,
         "attributes": attributes,
     }

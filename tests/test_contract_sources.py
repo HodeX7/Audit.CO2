@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
+import pytest
+
 from carbon_room.sources.period import parse_period
 from carbon_room.sources.readers import read
 from carbon_room.sources.store import store_file
@@ -38,6 +40,19 @@ def test_period_formats_and_verbatim_evidence_validation():
     assert not validate(
         {"activity": ["electricity_kwh"], "unit": "kWh", "page": 0, "excerpt": "1 kWh", "value": "1"}, ["1 kWh"]
     )[0]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Period: 2026-99-01 to 2026-99-30",
+        "Billing period: 31 Oct 2026 – 1 Oct 2026",
+        '{"period_start":"2026-10-31","period_end":"2026-10-01"}',
+    ],
+)
+def test_period_parser_rejects_invalid_or_reversed_calendar_dates(text):
+    with pytest.raises(ValueError, match="billing period"):
+        parse_period(text)
 
 
 def test_reader_errors_are_safe_for_room_visible_failures(tmp_path):

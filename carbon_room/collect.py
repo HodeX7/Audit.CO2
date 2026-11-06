@@ -121,7 +121,12 @@ def ingest_file(
                 )
             return []
         source_id = next_id(conn, "SRC")
-        period = parse_period("\n".join(pages)) if pages else None
+        period_error = None
+        try:
+            period = parse_period("\n".join(pages)) if pages else None
+        except ValueError as error:
+            period = None
+            period_error = f"invalid billing period: {error}"
         try:
             candidates = (
                 [cloud.extract(source_path)]
@@ -131,6 +136,10 @@ def ingest_file(
             valid, extraction_error = _validated_candidates(kind, pages, candidates) if pages else ([], result)
         except ValueError as error:
             valid, extraction_error = [], str(error)
+        if period_error:
+            valid, extraction_error = [], period_error
+        elif valid and period is None:
+            valid, extraction_error = [], "billing period is required"
         source = Source(
             source_id,
             close_id,

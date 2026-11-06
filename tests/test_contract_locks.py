@@ -7,8 +7,9 @@ from time import monotonic
 import pytest
 
 from carbon_room.ledger import connect, init_db, ledger
+from carbon_room.ledger.ids import next_id
 from carbon_room.ledger.locks import claim_lock
-from carbon_room.models import Actor, LockHeld
+from carbon_room.models import Actor, LockHeld, Source
 
 
 def test_active_lock_rejects_another_worker_and_stale_lock_is_reclaimed(db):
@@ -96,3 +97,33 @@ def test_two_connections_contending_during_a_source_write_report_the_lock_holder
     assert not first.is_alive()
     assert not second.is_alive()
     assert result == ["first-worker"]
+
+
+def test_next_id_reserves_the_writer_transaction_until_its_object_is_persisted(db):
+    actor = Actor("system", "seed", "Seed")
+    close_id = ledger.create_close(db, "2026-10", ["test-site"], "FS-test", actor, "msg")
+    db.commit()
+    source_id = next_id(db, "SRC")
+    assert source_id == "SRC-0001"
+    assert db.in_transaction
+    ledger.add_source(
+        db,
+        Source(
+            source_id,
+            close_id,
+            "test-site",
+            "utility_pdf",
+            "bill.pdf",
+            "var/store/bill.pdf",
+            "hash",
+            1,
+            "Usage: 1 kWh",
+            "2026-10-01",
+            "2026-10-31",
+            "OK",
+            None,
+        ),
+        actor,
+    )
+    db.commit()
+    assert next_id(db, "SRC") == "SRC-0002"

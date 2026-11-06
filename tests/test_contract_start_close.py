@@ -25,5 +25,7 @@ def test_start_close_validates_the_configured_factor_set_and_locks_it(db, tmp_pa
             core.start_close("2026-11", ["test-site"], "missing", actor, "msg-start")
         with pytest.raises(ValueError, match="valid sites: test-site"):
             core.start_close("2026-11", ["unknown-site"], "FS-test", actor, "msg-start")
+        with pytest.raises(ValueError, match="valid calendar month"):
+            core.start_close("2026-13", ["test-site"], "FS-test", actor, "msg-start")
     finally:
         config.clear_caches()

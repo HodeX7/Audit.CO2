@@ -9,7 +9,14 @@ Owner: Ujjwal. Package: `carbon_room`.
 - Newly ingested claims are always `UNVERIFIED`.
 - A parsed billing period determines a claim's month, including prior-period evidence collected for comparison.
 - Diesel activity is recorded as Scope 1; electricity as Scope 2; cloud data-centre activity as `DC`.
+- Missing, malformed, or reversed billing periods are retained as failed sources and create no claim.
+- A claim must reference a successfully extracted source using its stored SHA-256, a verbatim excerpt containing its
+  value, and the activity's required unit and scope. A selected factor must match the claim activity.
+- Location-based and market-based calculations for a claim coexist; only a newer calculation with the same basis
+  supersedes its predecessor.
 - Audit events are hash chained and append-only.
+- Standalone audit writes reserve a SQLite writer transaction before selecting their predecessor hash; sequential P1
+  identifiers use the same reservation so concurrent writers cannot reuse an ID.
 - Human uploads and every human-facing P1 ledger mutation require a real Switch `chat_message_id`; human actors
   cannot advance a close phase directly.
 - Only the Watchdog/system identity can mark a claim `VERIFIED`.
