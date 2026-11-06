@@ -10,6 +10,8 @@ The P1 acceptance baseline in `EXPECTED.md` documents the nine-claim seed run. I
 months (including comparison-period inputs), classifies diesel as Scope 1, and requires an intact audit chain.
 The ledger additionally rejects fabricated source evidence, invalid calendar periods, cross-close claim replacement,
 and activity-incompatible factor assignment; concurrency tests cover audit appends and identifier allocation.
+Its calculation handoff now exposes basis-filtered reads and both live calculations per claim, so P2 can retain
+location- and market-based data-centre results without overwriting either one.
 
 The P1 test suite also contains a separate, offline, cited corpus of fictional UK and Ireland activities in
 `tests/fixtures/emissions_reference/`. It verifies reader and ledger behavior without loading those references into

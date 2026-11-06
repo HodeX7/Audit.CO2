@@ -467,6 +467,107 @@ def test_calculations_supersede_only_within_the_same_basis(db):
         for row in db.execute("SELECT calc_id, superseded_by FROM calculations WHERE claim_id=?", (claim_id,))
     }
     assert rows == {location_v1: location_v2, market_v1: None, location_v2: None}
+    assert ledger.latest_calculation(db, claim_id, "location").calc_id == location_v2
+    assert ledger.latest_calculation(db, claim_id, "market").calc_id == market_v1
+    assert ledger.latest_calculation(db, claim_id).calc_id == location_v2
+    assert [calculation.basis for calculation in ledger.live_calculations(db, claim_id)] == ["location", "market"]
+    with pytest.raises(ValueError, match="calculation basis"):
+        ledger.add_calculation(db, calculation("CA-invalid", "spot", "0.4"))
+    with pytest.raises(ValueError, match="calculation basis"):
+        ledger.latest_calculation(db, claim_id, "spot")
+
+
+def test_data_centre_claim_keeps_location_and_market_calculations(db):
+    close_id = _close(db)
+    source = Source(
+        "SRC-dc",
+        close_id,
+        "test-site",
+        "cloud_invoice",
+        "cloud.json",
+        "var/store/cloud.json",
+        "dc-hash",
+        1,
+        "12 kWh",
+        "2026-10-01",
+        "2026-10-31",
+        "OK",
+        None,
+    )
+    ledger.add_source(db, source, SYSTEM)
+    claim_id = ledger.add_claim(
+        db,
+        Claim(
+            "CL-dc",
+            close_id,
+            "test-site",
+            "2026-10",
+            "dc_it_kwh",
+            Decimal("12"),
+            "kWh",
+            "DC",
+            source.source_doc_id,
+            "12 kWh",
+            source.sha256,
+            1,
+            None,
+            None,
+            "UNVERIFIED",
+            "collector",
+            None,
+            None,
+        ),
+        SYSTEM,
+    )
+    ledger.load_factors(
+        db,
+        [
+            {
+                "factor_id": "F-dc-location",
+                "source": "grid",
+                "version": "v1",
+                "year": "2026",
+                "activity": "dc_it_kwh",
+                "geography": "IE",
+                "value": Decimal("0.3"),
+                "unit": "kgCO2e/kWh",
+                "citation": "test",
+            },
+            {
+                "factor_id": "F-dc-market",
+                "source": "vendor",
+                "version": "v1",
+                "year": "2026",
+                "activity": "dc_it_kwh",
+                "geography": "IE",
+                "value": Decimal("0.1"),
+                "unit": "kgCO2e/kWh",
+                "citation": "test",
+            },
+        ],
+    )
+    for factor_id, basis, kilograms in (
+        ("F-dc-location", "location", "3.6"),
+        ("F-dc-market", "market", "1.2"),
+    ):
+        ledger.add_calculation(
+            db,
+            Calculation(
+                "",
+                claim_id,
+                factor_id,
+                "v1",
+                Decimal("12"),
+                "kWh",
+                Decimal("0.3"),
+                "kgCO2e/kWh",
+                Decimal(kilograms),
+                "test",
+                basis,
+            ),
+        )
+    assert [calculation.basis for calculation in ledger.live_calculations(db, claim_id)] == ["location", "market"]
+    assert ledger.latest_calculation(db, claim_id).basis == "location"
 
 
 def test_gap_ids_restart_for_each_close_without_colliding_in_storage(db):

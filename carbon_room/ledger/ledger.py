@@ -37,6 +37,16 @@ _CLOSE_PHASES = {
 }
 _ACTIVITY_UNITS = {"electricity_kwh": "kWh", "diesel_l": "L", "dc_it_kwh": "kWh"}
 _ACTIVITY_SCOPES = {"electricity_kwh": "2", "diesel_l": "1", "dc_it_kwh": "DC"}
+_CALCULATION_BASES = (None, "location", "market")
+_ANY_CALCULATION_BASIS = object()
+_PREFERRED_CALCULATION_ORDER = " ".join(
+    (
+        "CASE basis",
+        "WHEN 'location' THEN 0",
+        "WHEN 'market' THEN 2",
+        "ELSE 1 END, created_at DESC, calc_id DESC",
+    )
+)
 
 
 def _now() -> str:
@@ -315,6 +325,8 @@ def supersede(conn, old_claim_id, new_claim_id, actor, reason, chat_message_id) 
 
 
 def add_calculation(conn, calc: Calculation) -> str:
+    if calc.basis not in _CALCULATION_BASES:
+        raise ValueError(f"calculation basis must be 'location', 'market' or None, not {calc.basis!r}")
     claim = get_claim(conn, calc.claim_id)
     previous = _latest_calculation_for_basis(conn, calc.claim_id, calc.basis)
     calc_id = calc.calc_id or next_id(conn, "CA")
@@ -337,13 +349,33 @@ def add_calculation(conn, calc: Calculation) -> str:
     return calc_id
 
 
-def latest_calculation(conn, claim_id):
-    row = conn.execute(
-        "SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL "
-        "ORDER BY created_at DESC, calc_id DESC LIMIT 1",
-        (claim_id,),
-    ).fetchone()
+def latest_calculation(conn, claim_id, basis=_ANY_CALCULATION_BASIS):
+    """Return one live calculation, optionally for an accounting basis.
+
+    An unspecified basis preserves legacy callers while safely preferring a location-based value over a market-based
+    value. Pass ``basis="location"`` or ``basis="market"`` whenever the accounting method matters.
+    """
+    sql = "SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL"
+    params = [claim_id]
+    if basis is _ANY_CALCULATION_BASIS:
+        sql += f" ORDER BY {_PREFERRED_CALCULATION_ORDER}"
+    else:
+        if basis not in _CALCULATION_BASES:
+            raise ValueError(f"calculation basis must be 'location', 'market' or None, not {basis!r}")
+        sql += " AND basis IS ? ORDER BY created_at DESC, calc_id DESC"
+        params.append(basis)
+    row = conn.execute(sql + " LIMIT 1", params).fetchone()
     return _calc(row) if row else None
+
+
+def live_calculations(conn, claim_id):
+    """Return every live calculation for a claim, ordered location, legacy, then market."""
+    rows = conn.execute(
+        "SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL "
+        f"ORDER BY {_PREFERRED_CALCULATION_ORDER}",
+        (claim_id,),
+    )
+    return [_calc(row) for row in rows]
 
 
 def _latest_calculation_for_basis(conn, claim_id, basis):
