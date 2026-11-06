@@ -8,7 +8,7 @@ Owner: Richa. Package: `carbon_room.calc`. Everything here is reached through `c
 |---|---|
 | `core.calculate(close_id)` | Prices every live **non-data-centre** claim of the close, both months (the prior month is the baseline for later rules). Returns the live calculations. Safe to re-run: unchanged claims get no new calculation and no event. |
 | `calc.calculator.compute / recompute` | Pure Decimal arithmetic. The formula string records every input. `recompute` reruns it from stored inputs and reports an exact match or not. |
-| `calc.factors` | Loads `config/factors.csv`, resolves the locked factor per site and activity, resolves a vendor's own reference (`Ember 2024 IE`), and decides whether a factor is stale (`is_stale`). |
+| `calc.factors` | Loads `config/factors.csv`, resolves the locked factor per site and activity, resolves a vendor's own reference (`Ember 2024 IE`), and decides whether a factor is stale (`is_stale`). Malformed or catalogue-missing vendor references raise `FactorReferenceError`. |
 
 ## How a factor is chosen
 

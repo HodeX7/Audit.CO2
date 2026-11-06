@@ -51,8 +51,10 @@ def test_vendor_reference_resolves_to_the_catalogue_row(factor_db):
     stale = factors.factor_from_ref(factor_db, "Ember 2024 IE")
     assert stale["factor_id"] == "EMBER-2024-IE-dc_it_kwh"
     assert Decimal(stale["value"]) == Decimal("0.270767")
-    assert factors.factor_from_ref(factor_db, "Ember 2019 IE") is None
-    assert factors.factor_from_ref(factor_db, "nonsense") is None
+    with pytest.raises(factors.FactorReferenceError, match="not in the catalogue"):
+        factors.factor_from_ref(factor_db, "Ember 2019 IE")
+    with pytest.raises(factors.FactorReferenceError, match="malformed"):
+        factors.factor_from_ref(factor_db, "nonsense")
 
 
 def test_is_locked_distinguishes_the_stale_edition(factor_db, close_id):

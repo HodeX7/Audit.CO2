@@ -98,6 +98,10 @@ class FactorNotAllowed(ValueError):
     """A factor that does not belong to this site and activity, so it must not price the claim."""
 
 
+class FactorReferenceError(ValueError):
+    """A vendor factor reference is malformed or absent from the catalogue."""
+
+
 def ensure_allowed(site_id: str, activity: str, factor: dict) -> None:
     """Refuse a factor for the wrong activity, or from a source or geography the site's config does not prescribe.
 
@@ -116,13 +120,21 @@ def ensure_allowed(site_id: str, activity: str, factor: dict) -> None:
         )
 
 
-def factor_from_ref(conn, ref: str) -> dict | None:
-    """Resolve a vendor's own factor reference such as ``Ember 2024 IE``; None when the catalogue lacks it."""
+def factor_from_ref(conn, ref: str) -> dict:
+    """Resolve a vendor's own factor reference such as ``Ember 2024 IE``."""
     match = _REF.match(ref or "")
     if match is None:
-        return None
+        raise FactorReferenceError(
+            f"malformed factor reference {ref!r}; expected 'SOURCE YYYY GEOGRAPHY'"
+        )
     source, version, geography = match.group(1).upper(), match.group(2), match.group(3).upper()
-    return ledger.find_factor(conn, source, version, "dc_it_kwh", geography)
+    factor = ledger.find_factor(conn, source, version, "dc_it_kwh", geography)
+    if factor is None:
+        raise FactorReferenceError(
+            f"factor reference {ref!r} is not in the catalogue "
+            f"(expected {source} {version} dc_it_kwh in {geography})"
+        )
+    return factor
 
 
 def is_locked(close: dict, factor: dict) -> bool:
