@@ -1,0 +1,7 @@
+{"_source": "docs", "event": "message", "id": 103,
+ "data": {"type": "message", "room_id": "room-1", "bridge_id": null, "channel_type": "channel_public", "sequence": 103,
+          "payload": {"addressed": true, "sender": "@switch-user-priya:test", "sender_name": "priya",
+                      "message_id": "msg-att-1", "body": "", "timestamp": 1793000002000, "thread_id": "msg-root-1",
+                      "attachments": [{"filename": "warehouse2_electricity_2026-10_actual.pdf",
+                                       "mimetype": "application/pdf", "size": 48213,
+                                       "mxc": "mxc://switch.local/abc123", "msgtype": "m.file"}]}}}
