@@ -1,0 +1,117 @@
+{
+  "fixture_version": "2026-11-05",
+  "test_only": true,
+  "notice": "Synthetic activity records for offline P1 regression tests. They are not a production factor catalog or reporting guidance.",
+  "cases": [
+    {
+      "id": "p1-uk-grid-2026-100-kwh",
+      "document": "uk_grid_electricity_2026.csv",
+      "site": "warehouse-2",
+      "kind": "drive_csv",
+      "activity": "electricity_kwh",
+      "period_start": "2026-07-01",
+      "period_end": "2026-07-31",
+      "quantity": "100",
+      "unit": "kWh",
+      "expected_test_only": {
+        "factor_kgco2e_per_unit": "0.13096",
+        "kgco2e": "13.096",
+        "scope": "2",
+        "boundary": "UK generated electricity"
+      },
+      "provenance": {
+        "publisher": "UK Department for Energy Security and Net Zero",
+        "title": "Greenhouse gas reporting conversion factors 2026",
+        "edition": "2026 revised July flat file",
+        "url": "https://assets.publishing.service.gov.uk/media/6a6c9748862aaf18d9c62ac9/ghg-conversion-factors-2026-flat-format-revised.xlsx",
+        "row": "Electricity generated / Electricity: UK / kWh / total",
+        "gas_metric": "kgCO2e",
+        "accounting_method": "location-based"
+      }
+    },
+    {
+      "id": "p1-uk-td-2026-100-kwh",
+      "document": "uk_electricity_td_2026.csv",
+      "site": "warehouse-2",
+      "kind": "drive_csv",
+      "activity": "electricity_kwh",
+      "period_start": "2026-07-01",
+      "period_end": "2026-07-31",
+      "quantity": "100",
+      "unit": "kWh",
+      "expected_test_only": {
+        "factor_kgco2e_per_unit": "0.01299",
+        "kgco2e": "1.299",
+        "scope": "3",
+        "boundary": "UK electricity transmission and distribution"
+      },
+      "provenance": {
+        "publisher": "UK Department for Energy Security and Net Zero",
+        "title": "Greenhouse gas reporting conversion factors 2026",
+        "edition": "2026 revised July flat file",
+        "url": "https://assets.publishing.service.gov.uk/media/6a6c9748862aaf18d9c62ac9/ghg-conversion-factors-2026-flat-format-revised.xlsx",
+        "row": "Transmission and distribution / T&D- UK electricity / kWh",
+        "gas_metric": "kgCO2e",
+        "accounting_method": "location-based"
+      }
+    },
+    {
+      "id": "p1-uk-diesel-2026-10-l",
+      "document": "uk_diesel_2026.eml",
+      "site": "warehouse-2",
+      "kind": "email_invoice",
+      "activity": "diesel_l",
+      "period_start": "2026-07-01",
+      "period_end": "2026-07-31",
+      "quantity": "10",
+      "unit": "L",
+      "expected_test_only": {
+        "factor_kgco2e_per_unit": "2.58354",
+        "kgco2e": "25.83540",
+        "scope": "1",
+        "boundary": "owned or controlled asset combustion"
+      },
+      "provenance": {
+        "publisher": "UK Department for Energy Security and Net Zero",
+        "title": "Greenhouse gas reporting conversion factors 2026",
+        "edition": "2026 revised July flat file",
+        "url": "https://assets.publishing.service.gov.uk/media/6a6c9748862aaf18d9c62ac9/ghg-conversion-factors-2026-flat-format-revised.xlsx",
+        "row": "Diesel (average biofuel blend) / litres / total",
+        "gas_metric": "kgCO2e",
+        "accounting_method": "location-based"
+      }
+    },
+    {
+      "id": "p1-cloud-provider-envelope-2024",
+      "document": "ie_cloud_usage_2024.json",
+      "site": "dc-eu-west",
+      "kind": "cloud_invoice",
+      "activity": "dc_it_kwh",
+      "period_start": "2024-01-01",
+      "period_end": "2024-01-31",
+      "quantity": "100",
+      "unit": "kWh",
+      "expected_test_only": {
+        "provider": "fictional-cloud",
+        "accounting_method": "provider-allocated",
+        "methodology_version": "synthetic-envelope-v1",
+        "does_not_calculate_kgco2e": true
+      },
+      "provenance": {
+        "publisher": "Amazon Web Services",
+        "title": "Customer Carbon Footprint Tool allocation approach",
+        "edition": "methodology captured by this synthetic envelope",
+        "url": "https://docs.aws.amazon.com/sustainability/latest/userguide/methodology-allocation.html",
+        "row": "customer-account allocation methodology",
+        "gas_metric": "provider-reported",
+        "accounting_method": "provider-allocated"
+      }
+    }
+  ],
+  "excluded": [
+    "live source downloads",
+    "production factor loading",
+    "unreviewed EPA eGRID numerical rates",
+    "cloud emissions derived from a national grid factor"
+  ]
+}

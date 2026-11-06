@@ -15,7 +15,10 @@ carbonroom.db
 carbonroom.db-wal
 carbonroom.db-shm
 *.db
+var/
+out/
 data/store/
+data/cache/
 data/inbox/*
 !data/inbox/.gitkeep
 

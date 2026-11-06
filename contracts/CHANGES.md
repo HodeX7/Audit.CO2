@@ -1,32 +1,33 @@
 # Contract changes
 
-Shared contracts change only with team agreement. Each entry: what, why, who, status.
+The active contract implementation lives in `carbon_room/`.
 
-## 2026-11-03 - schema.sql v1 (Ujjwal) - PROPOSED, needs Richa + Akshar approval
+## 2026-11-05 — P1 integrity hardening
 
-`contracts/schema.sql` implements every table and column in Section 5.3 exactly. These are
-**additive** (no contract column was renamed or removed):
+- Fresh ledgers enforce the published close-phase and claim-status literals with SQLite checks.
+- Audit rows are append-only; updating or deleting an audit event is rejected by SQLite.
+- `claim_lock` now publishes its lease in its own SQLite transaction and rejects connections with uncommitted work.
+  This prevents an invisible lease during concurrent ingestion; P3 should call the public `core` functions rather
+  than the internal lock directly.
+- `start_close` now rejects an unknown or unavailable factor set and records the accepted set as
+  `factor_set_locked`. P2 supplies the contract-owned factor-set catalog in `config/carbon_room.yaml`.
+- A source with no proof-backed extraction candidate is retained as `FAILED`, with its deterministic rejection
+  reason, rather than being reported as successfully extracted.
+- A gap thread root message identifier is unique across the ledger.
+- Gap primary identity is `(close_id, gap_id)`, so `G-1` correctly restarts for each close as specified in P1-2.5.
+  **Integration note for P2/P3:** `core.resolve(gap_id, ...)` has no `close_id`, so their router must resolve the
+  active close before looking up a repeated gap identifier. No P2/P3 implementation exists on this branch yet.
+  The graph view represents this composite node as `<close_id>:<gap_id>` to keep graph edges unambiguous.
+- Factor loading remains the fixed global-catalog API `load_factors(conn, rows)`. P2 must load immutable,
+  versioned factor rows before starting a close. P1 now rejects an attempt to change an existing factor id; repeat
+  loads of an identical row are safe. P2 must create a new factor id for a changed factor.
+- P1 readers reject symlinked, non-regular, or over-10 MiB source files before parsing. P3 must resolve a Switch
+  attachment into a managed upload directory before calling P1; an arbitrary filesystem path is not a valid room
+  attachment contract.
+  A catalog-provenance/audit design needs team approval because the close-scoped `events` table cannot honestly
+  represent a factor load performed before any close exists.
+- No public `carbon_room.core` signature changed.
 
-| Table | Added | Why |
-| --- | --- | --- |
-| all | `CHECK` constraints on status/kind/scope enums; a trigger on every table that aborts `DELETE` | Honesty rule 3 enforced by the database, not by goodwill |
-| `sites` | `kind` (`facility`/`cloud`), `aliases_json` | Nimbus Cloud is a "site" row so gaps route to Dev in `cr-cloud`; aliases let code match a site named in a document |
-| `source_docs` | `original_name`, `doc_ref`, `page_count`, `meta_json` | `doc_ref` (e.g. INV-204) links corrected bills; `meta_json` keeps the chat thread/message/gap ids of an upload |
-| `activities` | `status_reason`, `created_at`; status adds nothing new (`SUPERSEDED` was already in 5.3's rules) | Why a status changed is shown in chat |
-| `instruments` | `site_id`, `certificate_id`, `excerpt`, `excerpt_locator`, `excerpt_sha256`, `status`, `superseded_by`, `extra_json`, `created_by`, `updated_at` | A REC is evidence too: same proof (excerpt + hash) and same supersede rule as activities |
-| `gaps` | `created_at`, `created_by`, `dedupe_key` (UNIQUE), `refs_json` | The same problem is never opened twice; gaps point at the rows/docs they are about |
-| `events` | `detail_json` | Structured audit details |
-| new `expected_documents` | `site_id`, `category`, `doc_kind`, `frequency` (`monthly`/`as_delivered`) | Lets the checker detect the missing Reno bill without guessing |
-| new `schema_meta` | `schema_version` | Migrations |
-
-Conventions written into the schema header:
-- Quantities, factors and results are **decimal strings** (TEXT). Read them with `Decimal(...)`, never `float`.
-- Timestamps are ISO-8601 UTC; periods are `YYYY-MM`.
-- Guards: evidence columns are immutable; `events`, `approvals`, `calculations` are append-only; a gap
-  can't be closed without `resolved_by` + `resolution`; a period can't be `CLOSED` without a recorded
-  `APPROVE` by the same handle.
-
-## Noted for Akshar (chat formats, 5.4)
-
-The gap example says "Please drop the **September** electricity bill" for a `2026-10` gap. It should say
-**October** (the missing Reno bill is October). No schema impact.
+Schema initialization can add missing triggers to an existing database, but it cannot retrofit SQLite table
+constraints or unique columns. Recreate a disposable local demo database before relying on the new constraints;
+production migration ownership must be agreed with the integration lead.

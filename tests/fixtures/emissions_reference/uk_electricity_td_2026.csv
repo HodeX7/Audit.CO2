@@ -1,0 +1,2 @@
+record_type,synthetic_notice,site,billing_period,description,usage
+utility_invoice,SYNTHETIC TEST FIXTURE - NOT A REAL INVOICE,Warehouse-2,2026-07-01 to 2026-07-31,UK electricity transmission and distribution test activity,Usage: 100 kWh
