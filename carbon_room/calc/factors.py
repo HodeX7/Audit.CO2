@@ -94,6 +94,28 @@ def locked_factor(conn, close: dict, site_id: str, activity: str) -> dict:
     return row
 
 
+class FactorNotAllowed(ValueError):
+    """A factor that does not belong to this site and activity, so it must not price the claim."""
+
+
+def ensure_allowed(site_id: str, activity: str, factor: dict) -> None:
+    """Refuse a factor for the wrong activity, or from a source or geography the site's config does not prescribe.
+
+    The version is deliberately not checked: an older edition is allowed here and judged by the stale-factor rule.
+    """
+    source, geography = source_and_geography(site_id, activity)
+    if factor["activity"] != activity:
+        raise FactorNotAllowed(
+            f"{factor['factor_id']} is for activity {factor['activity']}, but {site_id} needs a factor for "
+            f"activity {activity}"
+        )
+    if factor["source"] != source or factor["geography"] != geography:
+        raise FactorNotAllowed(
+            f"{factor['factor_id']} is from source {factor['source']} {factor['geography']}, but {site_id} "
+            f"{activity} must use source {source} {geography}"
+        )
+
+
 def factor_from_ref(conn, ref: str) -> dict | None:
     """Resolve a vendor's own factor reference such as ``Ember 2024 IE``; None when the catalogue lacks it."""
     match = _REF.match(ref or "")

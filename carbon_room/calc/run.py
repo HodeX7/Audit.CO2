@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
+import logging
+
 from carbon_room.actors import CALCULATOR
 from carbon_room.calc import factors
 from carbon_room.calc.calculator import compute
 from carbon_room.ledger import ledger
 from carbon_room.models import Calculation, Claim
 
+log = logging.getLogger(__name__)
+
 
 def choose_factor(conn, close: dict, claim: Claim) -> dict:
-    """A factor already set on the claim wins (a human may have switched it); otherwise the locked set decides."""
+    """Pick the factor for a claim.
+
+    A factor already on the claim (a human may have switched it) is honoured only if it is for the claim's activity
+    and comes from the source and geography the site's config prescribes. Its version may differ: an older edition
+    is priced as it is, and the stale-factor rule decides whether that is acceptable. Otherwise the locked set decides.
+    """
     if claim.factor_id:
-        return ledger.get_factor(conn, claim.factor_id)
+        factor = ledger.get_factor(conn, claim.factor_id)
+        factors.ensure_allowed(claim.site, claim.activity, factor)
+        return factor
     return factors.locked_factor(conn, close, claim.site, claim.activity)
 
 
@@ -27,6 +38,8 @@ def calculate(conn, close_id: str) -> list[Calculation]:
     results: list[Calculation] = []
     for claim in ledger.get_claims(conn, close_id):
         if claim.activity == "dc_it_kwh":
+            log.warning("%s is a data-centre claim: not calculated here, it needs the data-centre calculation",
+                        claim.claim_id)
             continue
         factor = choose_factor(conn, close, claim)
         if claim.factor_id != factor["factor_id"]:
