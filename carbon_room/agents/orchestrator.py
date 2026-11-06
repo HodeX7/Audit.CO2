@@ -120,3 +120,15 @@ async def handle_close_start(ctx: Context, event: RoomEvent, intent: Intent, act
         "findings": [],
     }
     await build_close_graph(ctx).ainvoke(state, {"configurable": {"thread_id": close_id}})
+
+
+async def resume(ctx: Context, close_id: str) -> None:
+    raise NotImplementedError
+
+
+async def handle_resume(ctx: Context, event: RoomEvent, intent: Intent, actor: Actor) -> None:
+    raise NotImplementedError
+
+
+async def resume_on_startup(ctx: Context) -> bool:
+    raise NotImplementedError
