@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from decimal import Decimal, InvalidOperation
 
-
 _ACTIVITY_UNITS = {
     "electricity_kwh": "kWh",
     "diesel_l": "L",

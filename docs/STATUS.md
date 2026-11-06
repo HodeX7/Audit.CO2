@@ -6,6 +6,9 @@
 guards, seed data, room-message attribution helpers, graph trace, explain boundary, and developer CLI are
 implemented and tested. P2 and P3 integrate through `carbon_room.core` and the frozen contract types.
 
+The P1 acceptance baseline in `EXPECTED.md` documents the nine-claim seed run. It preserves evidence billing
+months (including comparison-period inputs), classifies diesel as Scope 1, and requires an intact audit chain.
+
 The P1 test suite also contains a separate, offline, cited corpus of fictional UK and Ireland activities in
 `tests/fixtures/emissions_reference/`. It verifies reader and ledger behavior without loading those references into
 the production factor catalog.

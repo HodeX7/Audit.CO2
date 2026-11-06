@@ -8,7 +8,9 @@ from types import UnionType
 from typing import Any, Literal, TypeVar, Union, get_args, get_origin, get_type_hints
 
 Status = Literal["VERIFIED", "UNVERIFIED", "CONFLICTING", "STALE", "MISSING"]
-Phase = Literal["OPEN", "COLLECTING", "CALCULATING", "CHECKING", "AWAITING_HUMANS", "RECHECKING", "DRAFTED", "PUBLISHED"]
+Phase = Literal[
+    "OPEN", "COLLECTING", "CALCULATING", "CHECKING", "AWAITING_HUMANS", "RECHECKING", "DRAFTED", "PUBLISHED"
+]
 SourceKind = Literal["utility_pdf", "email_invoice", "drive_csv", "cloud_invoice"]
 Activity = Literal["electricity_kwh", "diesel_l", "dc_it_kwh"]
 
@@ -23,87 +25,177 @@ class Actor:
 
 @dataclass
 class Source:
-    source_doc_id: str; close_id: str; site: str | None; kind: SourceKind
-    file_name: str; stored_path: str; sha256: str; page_count: int; raw_text: str
-    period_start: str | None; period_end: str | None
-    extract_status: Literal["OK", "FAILED"]; extract_error: str | None
+    source_doc_id: str
+    close_id: str
+    site: str | None
+    kind: SourceKind
+    file_name: str
+    stored_path: str
+    sha256: str
+    page_count: int
+    raw_text: str
+    period_start: str | None
+    period_end: str | None
+    extract_status: Literal["OK", "FAILED"]
+    extract_error: str | None
 
 
 @dataclass
 class Claim:
-    claim_id: str; close_id: str; site: str; month: str; activity: Activity
-    value: Decimal; unit: str; scope: Literal["1", "2", "3", "DC"]
-    source_doc_id: str; source_excerpt: str; source_sha256: str; source_page: int
-    factor_id: str | None; factor_version: str | None
-    status: Status; extracted_by: str; checked_by: str | None; superseded_by: str | None
+    claim_id: str
+    close_id: str
+    site: str
+    month: str
+    activity: Activity
+    value: Decimal
+    unit: str
+    scope: Literal["1", "2", "3", "DC"]
+    source_doc_id: str
+    source_excerpt: str
+    source_sha256: str
+    source_page: int
+    factor_id: str | None
+    factor_version: str | None
+    status: Status
+    extracted_by: str
+    checked_by: str | None
+    superseded_by: str | None
     attributes: dict = field(default_factory=dict)
 
 
 @dataclass
 class Calculation:
-    calc_id: str; claim_id: str; factor_id: str; factor_version: str
-    activity_value: Decimal; activity_unit: str; factor_value: Decimal; factor_unit: str
-    kgco2e: Decimal; formula: str
+    calc_id: str
+    claim_id: str
+    factor_id: str
+    factor_version: str
+    activity_value: Decimal
+    activity_unit: str
+    factor_value: Decimal
+    factor_unit: str
+    kgco2e: Decimal
+    formula: str
     basis: Literal["location", "market"] | None
 
 
 @dataclass
 class Option:
-    key: str; action: Literal["pick", "approve", "reject", "upload"]; label: str
+    key: str
+    action: Literal["pick", "approve", "reject", "upload"]
+    label: str
     params: dict = field(default_factory=dict)
 
 
 @dataclass
 class Finding:
-    finding_id: str; rule: Literal["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
+    finding_id: str
+    rule: Literal["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
     kind: Literal["MISSING", "CONFLICTING", "STALE", "PERIOD", "VARIANCE", "DATACENTRE", "FINANCE"]
-    claim_ids: list[str]; site: str; month: str; owner: str; title: str
-    evidence: list[str]; options: list[Option]; tier: Literal[1, 2, 3]; blocking: bool
+    claim_ids: list[str]
+    site: str
+    month: str
+    owner: str
+    title: str
+    evidence: list[str]
+    options: list[Option]
+    tier: Literal[1, 2, 3]
+    blocking: bool
 
 
 @dataclass
 class Gap:
-    gap_id: str; close_id: str; finding_id: str; rule: str; kind: str; title: str
-    owner: str; status: Literal["OPEN", "RESOLVED"]; claim_ids: list[str]; options: list[Option]
-    thread_root_message_id: str | None; opened_at: str; resolved_by: str | None
-    resolved_message_id: str | None; resolution: dict | None
+    gap_id: str
+    close_id: str
+    finding_id: str
+    rule: str
+    kind: str
+    title: str
+    owner: str
+    status: Literal["OPEN", "RESOLVED"]
+    claim_ids: list[str]
+    options: list[Option]
+    thread_root_message_id: str | None
+    opened_at: str
+    resolved_by: str | None
+    resolved_message_id: str | None
+    resolution: dict | None
 
 
 @dataclass
 class IngestReport:
-    close_id: str; sources_seen: int; claims_created: list[str]; failed_sources: list[str]; statement: str
+    close_id: str
+    sources_seen: int
+    claims_created: list[str]
+    failed_sources: list[str]
+    statement: str
 
 
 @dataclass
 class DcLine:
-    location_kgco2e: Decimal | None; market_kgco2e: Decimal | None; pue: Decimal | None
-    rec_flag: str; ai_line_status: Literal["UNVERIFIED"]; note: str
+    location_kgco2e: Decimal | None
+    market_kgco2e: Decimal | None
+    pue: Decimal | None
+    rec_flag: str
+    ai_line_status: Literal["UNVERIFIED"]
+    note: str
 
 
 @dataclass
 class CloseSummary:
-    close_id: str; phase: Phase; verified_kgco2e: Decimal; excluded_kgco2e: Decimal; coverage_pct: Decimal
-    sources_expected: int; sources_verified: int; open_gaps: list[Gap]; dc_line: DcLine | None
+    close_id: str
+    phase: Phase
+    verified_kgco2e: Decimal
+    excluded_kgco2e: Decimal
+    coverage_pct: Decimal
+    sources_expected: int
+    sources_verified: int
+    open_gaps: list[Gap]
+    dc_line: DcLine | None
 
 
 @dataclass
 class SourceTag:
-    tag: str; file_name: str; page: int; excerpt: str; sha256: str; activity: str; value: Decimal; unit: str
-    factor_id: str; factor_version: str; geography: str; recompute: str; kgco2e: Decimal; status: Status
-    approver: str | None; chat_message_id: str | None
+    tag: str
+    file_name: str
+    page: int
+    excerpt: str
+    sha256: str
+    activity: str
+    value: Decimal
+    unit: str
+    factor_id: str
+    factor_version: str
+    geography: str
+    recompute: str
+    kgco2e: Decimal
+    status: Status
+    approver: str | None
+    chat_message_id: str | None
 
 
 @dataclass
 class Report:
-    close_id: str; version: int; verified_total_tCO2e: Decimal; unverified_excluded_tCO2e: Decimal
-    coverage_pct: Decimal; source_coverage: str; gaps: list[dict]; conflicts: list[dict]; factor_versions: list[str]
-    datacentre_line: DcLine | None; s_tags: list[SourceTag]; compliance_flags: list[str]
-    approver: str | None; published_at: str | None
+    close_id: str
+    version: int
+    verified_total_tCO2e: Decimal
+    unverified_excluded_tCO2e: Decimal
+    coverage_pct: Decimal
+    source_coverage: str
+    gaps: list[dict]
+    conflicts: list[dict]
+    factor_versions: list[str]
+    datacentre_line: DcLine | None
+    s_tags: list[SourceTag]
+    compliance_flags: list[str]
+    approver: str | None
+    published_at: str | None
 
 
 @dataclass
 class AuditCheck:
-    ok: bool; events: int; first_bad_event_id: int | None
+    ok: bool
+    events: int
+    first_bad_event_id: int | None
 
 
 class CarbonRoomError(Exception):

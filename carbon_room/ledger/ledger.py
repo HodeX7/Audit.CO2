@@ -9,16 +9,30 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from carbon_room.models import (
-    Actor, Calculation, Finding, Gap, NeedsRoomEvent, NotAllowed, NotFound, Option, Source,
-)
 from carbon_room.ledger.audit import actor_id, append_event
 from carbon_room.ledger.ids import next_id
+from carbon_room.models import (
+    Actor,
+    Calculation,
+    Finding,
+    Gap,
+    NeedsRoomEvent,
+    NotAllowed,
+    NotFound,
+    Option,
+    Source,
+)
 
 _CLAIM_STATUSES = {"VERIFIED", "UNVERIFIED", "CONFLICTING", "STALE"}
 _CLOSE_PHASES = {
-    "OPEN", "COLLECTING", "CALCULATING", "CHECKING", "AWAITING_HUMANS",
-    "RECHECKING", "DRAFTED", "PUBLISHED",
+    "OPEN",
+    "COLLECTING",
+    "CALCULATING",
+    "CHECKING",
+    "AWAITING_HUMANS",
+    "RECHECKING",
+    "DRAFTED",
+    "PUBLISHED",
 }
 _ACTIVITY_UNITS = {"electricity_kwh": "kWh", "diesel_l": "L", "dc_it_kwh": "kWh"}
 
@@ -45,7 +59,8 @@ def _close_or_raise(conn: sqlite3.Connection, close_id: str) -> sqlite3.Row:
 
 def _source(row: sqlite3.Row) -> Source:
     value = dict(row)
-    value.pop("ingested_by"); value.pop("ingested_at")
+    value.pop("ingested_by")
+    value.pop("ingested_at")
     return Source(**value)
 
 
@@ -63,7 +78,8 @@ def _calc(row: sqlite3.Row) -> Calculation:
     value = dict(row)
     for key in ("activity_value", "factor_value", "kgco2e"):
         value[key] = Decimal(value[key])
-    value.pop("created_at"); value.pop("superseded_by")
+    value.pop("created_at")
+    value.pop("superseded_by")
     return Calculation(**value)
 
 
@@ -79,14 +95,17 @@ def create_close(conn, month, sites, factor_set, actor, chat_message_id) -> str:
     _human_message(actor, chat_message_id)
     if len(month) != 7 or month[4] != "-":
         raise ValueError("month must use YYYY-MM")
-    version = int(conn.execute("SELECT COALESCE(MAX(version), 0) + 1 FROM closes WHERE month = ?", (month,)).fetchone()[0])
+    version = int(
+        conn.execute("SELECT COALESCE(MAX(version), 0) + 1 FROM closes WHERE month = ?", (month,)).fetchone()[0]
+    )
     close_id = f"{month}-v{version}"
     conn.execute(
         "INSERT INTO closes VALUES (?,?,?,?,?,?,?,?,NULL,NULL,NULL)",
         (close_id, month, _json(list(sites)), factor_set, "OPEN", version, actor_id(actor), chat_message_id),
     )
-    append_event(conn, close_id, actor, "factor_set_locked", chat_message_id=chat_message_id,
-                 payload={"factor_set": factor_set})
+    append_event(
+        conn, close_id, actor, "factor_set_locked", chat_message_id=chat_message_id, payload={"factor_set": factor_set}
+    )
     return close_id
 
 
@@ -120,7 +139,11 @@ def add_source(conn, source: Source, actor, chat_message_id: str | None = None) 
         (*asdict(source).values(), actor_id(actor), _now()),
     )
     append_event(
-        conn, source.close_id, actor, "source_added", chat_message_id=chat_message_id,
+        conn,
+        source.close_id,
+        actor,
+        "source_added",
+        chat_message_id=chat_message_id,
         payload={"source_doc_id": source.source_doc_id},
     )
     return source.source_doc_id
@@ -129,15 +152,14 @@ def add_source(conn, source: Source, actor, chat_message_id: str | None = None) 
 def get_sources(conn, close_id, *, site=None) -> list[Source]:
     sql, params = "SELECT * FROM sources WHERE close_id = ?", [close_id]
     if site is not None:
-        sql += " AND site = ?"; params.append(site)
+        sql += " AND site = ?"
+        params.append(site)
     return [_source(row) for row in conn.execute(sql, params)]
 
 
 def source_for_sha(conn, close_id, sha256) -> Source | None:
     """Return an existing source for a close-local content digest, if present."""
-    row = conn.execute(
-        "SELECT * FROM sources WHERE close_id = ? AND sha256 = ?", (close_id, sha256)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM sources WHERE close_id = ? AND sha256 = ?", (close_id, sha256)).fetchone()
     return _source(row) if row else None
 
 
@@ -159,12 +181,24 @@ def add_claim(conn, claim, actor, chat_message_id: str | None = None) -> str:
     if source is None or source["close_id"] != claim.close_id:
         raise ValueError("claim source must belong to the same close")
     claim_id = claim.claim_id or next_id(conn, "CL")
-    values = asdict(claim) | {"claim_id": claim_id, "value": str(claim.value), "status": "UNVERIFIED", "checked_by": None,
-                              "attributes": _json(claim.attributes), "created_at": _now()}
-    columns = ",".join(values); placeholders = ",".join(f":{key}" for key in values)
+    values = asdict(claim) | {
+        "claim_id": claim_id,
+        "value": str(claim.value),
+        "status": "UNVERIFIED",
+        "checked_by": None,
+        "attributes": _json(claim.attributes),
+        "created_at": _now(),
+    }
+    columns = ",".join(values)
+    placeholders = ",".join(f":{key}" for key in values)
     conn.execute(f"INSERT INTO claims ({columns}) VALUES ({placeholders})", values)
     append_event(
-        conn, claim.close_id, actor, "claim_added", claim_id=claim_id, after="UNVERIFIED",
+        conn,
+        claim.close_id,
+        actor,
+        "claim_added",
+        claim_id=claim_id,
+        after="UNVERIFIED",
         chat_message_id=chat_message_id,
     )
     return claim_id
@@ -181,7 +215,8 @@ def get_claims(conn, close_id, *, site=None, month=None, activity=None, live_onl
     sql, params = "SELECT * FROM claims WHERE close_id = ?", [close_id]
     for column, value in (("site", site), ("month", month), ("activity", activity)):
         if value is not None:
-            sql += f" AND {column} = ?"; params.append(value)
+            sql += f" AND {column} = ?"
+            params.append(value)
     if live_only:
         sql += " AND superseded_by IS NULL"
     return [_claim(row) for row in conn.execute(sql, params)]
@@ -194,56 +229,119 @@ def set_status(conn, claim_id, new_status, actor, reason, chat_message_id=None) 
     if new_status == "VERIFIED" and not (actor.kind == "system" or actor.id == "watchdog"):
         raise NotAllowed("only the system or watchdog may set VERIFIED")
     claim = get_claim(conn, claim_id)
-    conn.execute("UPDATE claims SET status = ?, checked_by = ? WHERE claim_id = ?", (new_status, actor_id(actor), claim_id))
-    append_event(conn, claim.close_id, actor, "status_changed", claim_id=claim_id, before=claim.status, after=new_status,
-                 chat_message_id=chat_message_id, reason=reason)
+    conn.execute(
+        "UPDATE claims SET status = ?, checked_by = ? WHERE claim_id = ?", (new_status, actor_id(actor), claim_id)
+    )
+    append_event(
+        conn,
+        claim.close_id,
+        actor,
+        "status_changed",
+        claim_id=claim_id,
+        before=claim.status,
+        after=new_status,
+        chat_message_id=chat_message_id,
+        reason=reason,
+    )
 
 
 def set_factor(conn, claim_id, factor_id, factor_version, actor, reason, chat_message_id=None) -> None:
-    _human_message(actor, chat_message_id); claim = get_claim(conn, claim_id)
+    _human_message(actor, chat_message_id)
+    claim = get_claim(conn, claim_id)
     factor = get_factor(conn, factor_id)
     if factor["version"] != factor_version:
         raise ValueError(f"factor version mismatch for {factor_id!r}")
-    conn.execute("UPDATE claims SET factor_id = ?, factor_version = ? WHERE claim_id = ?", (factor_id, factor_version, claim_id))
-    append_event(conn, claim.close_id, actor, "factor_set", claim_id=claim_id, chat_message_id=chat_message_id, reason=reason,
-                 payload={"factor_id": factor_id, "factor_version": factor_version})
+    conn.execute(
+        "UPDATE claims SET factor_id = ?, factor_version = ? WHERE claim_id = ?", (factor_id, factor_version, claim_id)
+    )
+    append_event(
+        conn,
+        claim.close_id,
+        actor,
+        "factor_set",
+        claim_id=claim_id,
+        chat_message_id=chat_message_id,
+        reason=reason,
+        payload={"factor_id": factor_id, "factor_version": factor_version},
+    )
 
 
 def supersede(conn, old_claim_id, new_claim_id, actor, reason, chat_message_id) -> None:
-    _human_message(actor, chat_message_id); old = get_claim(conn, old_claim_id)
+    _human_message(actor, chat_message_id)
+    old = get_claim(conn, old_claim_id)
     conn.execute("UPDATE claims SET superseded_by = ? WHERE claim_id = ?", (new_claim_id, old_claim_id))
-    append_event(conn, old.close_id, actor, "claim_superseded", claim_id=old_claim_id, before=old.status,
-                 chat_message_id=chat_message_id, reason=reason, payload={"superseded_by": new_claim_id})
+    append_event(
+        conn,
+        old.close_id,
+        actor,
+        "claim_superseded",
+        claim_id=old_claim_id,
+        before=old.status,
+        chat_message_id=chat_message_id,
+        reason=reason,
+        payload={"superseded_by": new_claim_id},
+    )
 
 
 def add_calculation(conn, calc: Calculation) -> str:
-    claim = get_claim(conn, calc.claim_id); previous = latest_calculation(conn, calc.claim_id)
+    claim = get_claim(conn, calc.claim_id)
+    previous = latest_calculation(conn, calc.claim_id)
     calc_id = calc.calc_id or next_id(conn, "CA")
-    values = asdict(calc) | {"calc_id": calc_id, "activity_value": str(calc.activity_value), "factor_value": str(calc.factor_value),
-                              "kgco2e": str(calc.kgco2e), "created_at": _now(), "superseded_by": None}
-    columns = ",".join(values); placeholders = ",".join(f":{key}" for key in values)
+    values = asdict(calc) | {
+        "calc_id": calc_id,
+        "activity_value": str(calc.activity_value),
+        "factor_value": str(calc.factor_value),
+        "kgco2e": str(calc.kgco2e),
+        "created_at": _now(),
+        "superseded_by": None,
+    }
+    columns = ",".join(values)
+    placeholders = ",".join(f":{key}" for key in values)
     conn.execute(f"INSERT INTO calculations ({columns}) VALUES ({placeholders})", values)
     if previous:
         conn.execute("UPDATE calculations SET superseded_by = ? WHERE calc_id = ?", (calc_id, previous.calc_id))
-    append_event(conn, claim.close_id, "system", "calculation_added", claim_id=calc.claim_id, payload={"calc_id": calc_id})
+    append_event(
+        conn, claim.close_id, "system", "calculation_added", claim_id=calc.claim_id, payload={"calc_id": calc_id}
+    )
     return calc_id
 
 
 def latest_calculation(conn, claim_id):
-    row = conn.execute("SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL ORDER BY created_at DESC, calc_id DESC LIMIT 1", (claim_id,)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM calculations WHERE claim_id = ? AND superseded_by IS NULL "
+        "ORDER BY created_at DESC, calc_id DESC LIMIT 1",
+        (claim_id,),
+    ).fetchone()
     return _calc(row) if row else None
 
 
 def upsert_gap(conn, close_id, finding: Finding):
-    existing = conn.execute("SELECT * FROM gaps WHERE close_id = ? AND finding_id = ?", (close_id, finding.finding_id)).fetchone()
+    existing = conn.execute(
+        "SELECT * FROM gaps WHERE close_id = ? AND finding_id = ?", (close_id, finding.finding_id)
+    ).fetchone()
     if existing:
         return _gap(existing)
     count = conn.execute("SELECT COUNT(*) FROM gaps WHERE close_id = ?", (close_id,)).fetchone()[0]
     gap_id = f"G-{count + 1}"
     conn.execute(
         "INSERT INTO gaps VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (gap_id, close_id, finding.finding_id, finding.rule, finding.kind, finding.title, finding.owner, "OPEN",
-         _json(finding.claim_ids), _json([asdict(option) for option in finding.options]), None, _now(), None, None, None),
+        (
+            gap_id,
+            close_id,
+            finding.finding_id,
+            finding.rule,
+            finding.kind,
+            finding.title,
+            finding.owner,
+            "OPEN",
+            _json(finding.claim_ids),
+            _json([asdict(option) for option in finding.options]),
+            None,
+            _now(),
+            None,
+            None,
+            None,
+        ),
     )
     append_event(conn, close_id, "system", "gap_opened", payload={"gap_id": gap_id, "finding_id": finding.finding_id})
     return get_gap(conn, gap_id, close_id)
@@ -252,7 +350,8 @@ def upsert_gap(conn, close_id, finding: Finding):
 def get_gaps(conn, close_id, *, status=None):
     sql, params = "SELECT * FROM gaps WHERE close_id = ?", [close_id]
     if status is not None:
-        sql += " AND status = ?"; params.append(status)
+        sql += " AND status = ?"
+        params.append(status)
     return [_gap(row) for row in conn.execute(sql, params)]
 
 
@@ -282,13 +381,17 @@ def set_gap_thread(conn, close_id, gap_id, message_id) -> None:
         (message_id, close_id, gap_id),
     )
     append_event(
-        conn, close_id, "system", "gap_thread_recorded",
+        conn,
+        close_id,
+        "system",
+        "gap_thread_recorded",
         payload={"gap_id": gap_id, "message_id": message_id},
     )
 
 
 def resolve_gap(conn, close_id, gap_id, actor, chat_message_id, resolution) -> None:
-    _human_message(actor, chat_message_id); gap = get_gap(conn, gap_id, close_id)
+    _human_message(actor, chat_message_id)
+    gap = get_gap(conn, gap_id, close_id)
     if gap.status != "OPEN":
         raise ValueError(f"gap {gap_id} is already resolved")
     conn.execute(
@@ -304,16 +407,38 @@ def add_approval(conn, close_id, subject_type, subject_id, tier, actor, decision
     if not chat_message_id:
         raise NeedsRoomEvent("approvals require a Switch chat_message_id")
     approval_id = f"AP-{conn.execute('SELECT COUNT(*) FROM approvals').fetchone()[0] + 1:04d}"
-    conn.execute("INSERT INTO approvals VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                 (approval_id, close_id, subject_type, subject_id, tier, actor.id, actor.role, decision, reason, chat_message_id, _now()))
-    append_event(conn, close_id, actor, "approval_recorded", chat_message_id=chat_message_id, payload={"approval_id": approval_id})
+    conn.execute(
+        "INSERT INTO approvals VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            approval_id,
+            close_id,
+            subject_type,
+            subject_id,
+            tier,
+            actor.id,
+            actor.role,
+            decision,
+            reason,
+            chat_message_id,
+            _now(),
+        ),
+    )
+    append_event(
+        conn,
+        close_id,
+        actor,
+        "approval_recorded",
+        chat_message_id=chat_message_id,
+        payload={"approval_id": approval_id},
+    )
     return approval_id
 
 
 def get_approvals(conn, close_id, *, subject_id=None):
     sql, params = "SELECT * FROM approvals WHERE close_id = ?", [close_id]
     if subject_id is not None:
-        sql += " AND subject_id = ?"; params.append(subject_id)
+        sql += " AND subject_id = ?"
+        params.append(subject_id)
     return [dict(row) for row in conn.execute(sql, params)]
 
 
@@ -331,8 +456,11 @@ def load_factors(conn, rows):
             if dict(existing) != incoming:
                 raise ValueError(f"factor {incoming['factor_id']!r} is immutable; create a new factor id")
             continue
-        conn.execute("""INSERT INTO factors VALUES (:factor_id,:source,:version,:year,:activity,:geography,:value,:unit,:citation)""",
-                     incoming)
+        conn.execute(
+            "INSERT INTO factors VALUES "
+            "(:factor_id,:source,:version,:year,:activity,:geography,:value,:unit,:citation)",
+            incoming,
+        )
     return len(rows)
 
 
@@ -344,23 +472,27 @@ def get_factor(conn, factor_id):
 
 
 def find_factor(conn, source, version, activity, geography):
-    row = conn.execute("SELECT * FROM factors WHERE source=? AND version=? AND activity=? AND geography=?", (source, version, activity, geography)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM factors WHERE source=? AND version=? AND activity=? AND geography=?",
+        (source, version, activity, geography),
+    ).fetchone()
     return dict(row) if row else None
 
 
 def assign_s_tags(conn, close_id, version, calc_ids):
     mapping = {}
     used_tags = {
-        row["tag"] for row in conn.execute(
-            "SELECT tag FROM s_tags WHERE close_id=? AND version=?", (close_id, version)
-        )
+        row["tag"] for row in conn.execute("SELECT tag FROM s_tags WHERE close_id=? AND version=?", (close_id, version))
     }
     next_number = 1
     new_tags = 0
     for calc_id in calc_ids:
-        existing = conn.execute("SELECT tag FROM s_tags WHERE close_id=? AND version=? AND calc_id=?", (close_id, version, calc_id)).fetchone()
+        existing = conn.execute(
+            "SELECT tag FROM s_tags WHERE close_id=? AND version=? AND calc_id=?", (close_id, version, calc_id)
+        ).fetchone()
         if existing:
-            mapping[calc_id] = existing["tag"]; continue
+            mapping[calc_id] = existing["tag"]
+            continue
         calc = conn.execute(
             """SELECT calculations.claim_id, claims.close_id
                FROM calculations JOIN claims ON claims.claim_id = calculations.claim_id

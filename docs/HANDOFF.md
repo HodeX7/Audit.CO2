@@ -7,6 +7,8 @@ Owner: Ujjwal. Package: `carbon_room`.
 - SQLite is the authoritative ledger; quantities are stored as exact Decimal-compatible text.
 - Source bytes are content-addressed and each source SHA-256 is unique within a close.
 - Newly ingested claims are always `UNVERIFIED`.
+- A parsed billing period determines a claim's month, including prior-period evidence collected for comparison.
+- Diesel activity is recorded as Scope 1; electricity as Scope 2; cloud data-centre activity as `DC`.
 - Audit events are hash chained and append-only.
 - Human uploads and every human-facing P1 ledger mutation require a real Switch `chat_message_id`; human actors
   cannot advance a close phase directly.
@@ -51,6 +53,9 @@ close-scoped audit chain cannot represent
 global factor-catalog bootstrap without a team-approved catalog-audit design.
 
 ## Verification before integration
+
+`EXPECTED.md` is the deterministic P1 seed-ingestion acceptance baseline (nine claims, source-period assignment,
+scope classification, idempotency, and audit verification).
 
 ```bash
 uv run pytest

@@ -51,9 +51,7 @@ def test_two_connections_contending_during_a_source_write_report_the_lock_holder
     database = tmp_path / "contended.db"
     setup = connect(database)
     init_db(setup)
-    close_id = ledger.create_close(
-        setup, "2026-10", ["test-site"], "FS-test", Actor("system", "seed", "Seed"), "msg"
-    )
+    close_id = ledger.create_close(setup, "2026-10", ["test-site"], "FS-test", Actor("system", "seed", "Seed"), "msg")
     setup.commit()
     setup.close()
 

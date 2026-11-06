@@ -11,7 +11,9 @@ def parse_period(text: str) -> tuple[str, str] | None:
     iso = re.search(r"(?:Period:\s*)?(\d{4}-\d{2}-\d{2})\s+(?:to|–|-)\s+(\d{4}-\d{2}-\d{2})", text)
     if iso:
         return iso.group(1), iso.group(2)
-    natural = re.search(r"Billing period:\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s*(?:–|-)\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})", text)
+    natural = re.search(
+        r"Billing period:\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s*(?:–|-)\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})", text
+    )
     if natural:
         return tuple(datetime.strptime(value, "%d %b %Y").date().isoformat() for value in natural.groups())
     json_dates = dict(re.findall(r'"(period_start|period_end)"\s*:\s*"(\d{4}-\d{2}-\d{2})"', text))

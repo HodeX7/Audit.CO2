@@ -21,8 +21,9 @@ class Collector:
         """Collect the close's configured seed and baseline evidence."""
         return core.ingest(close_id, actor)
 
-    def ingest_file(self, close_id: str, path: str | Path, actor: Actor, chat_message_id: str,
-                    site: str | None = None) -> list[str]:
+    def ingest_file(
+        self, close_id: str, path: str | Path, actor: Actor, chat_message_id: str, site: str | None = None
+    ) -> list[str]:
         """Record a human-uploaded attachment with its originating Switch message."""
         return core.ingest_file(close_id, path, actor, chat_message_id, site)
 

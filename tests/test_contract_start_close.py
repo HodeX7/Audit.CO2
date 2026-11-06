@@ -11,9 +11,7 @@ def test_start_close_validates_the_configured_factor_set_and_locks_it(db, tmp_pa
         '{"sites":[{"id":"test-site","name":"Test Site","owner":"lead","expected":[]}]}',
         encoding="utf-8",
     )
-    (tmp_path / "carbon_room.yaml").write_text(
-        '{"factor_sets":{"FS-test":{"DEFRA":"2026"}}}', encoding="utf-8"
-    )
+    (tmp_path / "carbon_room.yaml").write_text('{"factor_sets":{"FS-test":{"DEFRA":"2026"}}}', encoding="utf-8")
     monkeypatch.setenv("CARBON_ROOM_CONFIG_DIR", str(tmp_path))
     monkeypatch.setattr(core, "connect", lambda: db)
     config.clear_caches()
