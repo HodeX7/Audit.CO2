@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit.CO2 — Autonomous Multi-Agent Emissions Architecture</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #0d1527 0%, #050814 100%);
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .font-mono { font-family: 'Fira Code', monospace; }
+    
+    /* Neon Glows & Accents */
+    .glow-cyan { box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.4); }
+    .glow-purple { box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.4); }
+    .glow-emerald { box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.4); }
+    .glow-amber { box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.4); }
+    
+    .border-glow-cyan { border-color: rgba(6, 182, 212, 0.6); box-shadow: 0 0 15px rgba(6, 182, 212, 0.25); }
+    
+    /* Pulse Keyframes */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+    .animate-pulse-glow { animation: pulseGlow 3s infinite ease-in-out; }
+
+    /* Animated connector lines */
+    @keyframes dash {
+      to { stroke-dashoffset: -40; }
+    }
+    .flowing-line {
+      stroke-dasharray: 6 6;
+      animation: dash 1.2s linear infinite;
+    }
+    
+    .glass-card {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card-active {
+      background: rgba(20, 32, 58, 0.9);
+      border: 1px solid rgba(6, 182, 212, 0.7);
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.3);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #050814; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200">
+
+  <!-- TOP APP BAR -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="h-9 w-9 rounded-lg bg-gradient-to-tr from-cyan-500 to-emerald-400 flex items-center justify-center font-black text-slate-950 text-xl shadow-lg shadow-cyan-500/30">
+          CO₂
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-lg text-white tracking-tight">Audit.CO2 Architecture</h1>
+            <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-950 text-cyan-400 border border-cyan-800">Judge Demo View</span>
+          </div>
+          <p class="text-xs text-slate-400">Autonomous Multi-Agent Enterprise Carbon Accounting with Cryptographic Proof Boundary</p>
+        </div>
+      </div>
+
+      <!-- WORKFLOW CONTROLS -->
+      <div class="flex items-center gap-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1 flex items-center gap-1 shadow-inner">
+          <button id="prevBtn" class="px-3 py-1.5 rounded text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">← Prev</button>
+          <div id="stepCounter" class="px-3 py-1 text-xs font-mono font-semibold text-cyan-400">Step 1 / 6</div>
+          <button id="nextBtn" class="px-3 py-1.5 rounded text-xs font-medium bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30 transition">Next Step →</button>
+        </div>
+        <button id="autoPlayBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition flex items-center gap-1.5">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>Auto Tour</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- STEP PROGRESS TRACKER -->
+  <section class="max-w-7xl mx-auto px-6 pt-6">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+      <button onclick="setStep(1)" class="step-tab text-left p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition" id="tab-1">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 block font-mono">01. Initiation</span>
+        <span class="font-medium text-slate-200">Start Close</span>
+      </button>
+      <button onclick="setStep(2)" class="step-tab text-left p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition" id="tab-2">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 block font-mono">02. Collection</span>
+        <span class="font-medium text-slate-200">Proof Boundary</span>
+      </button>
+      <button onclick="setStep(3)" class="step-tab text-left p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition" id="tab-3">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 block font-mono">03. Audit Engine</span>
+        <span class="font-medium text-slate-200">7 Deterministic Rules</span>
+      </button>
+      <button onclick="setStep(4)" class="step-tab text-left p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition" id="tab-4">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 block font-mono">04. HITL</span>
+        <span class="font-medium text-slate-200">Human Resolution</span>
+      </button>
+      <button onclick="setStep(5)" class="step-tab text-left p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition" id="tab-5">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 block font-mono">05. Disclosure</span>
+        <span class="font-medium text-slate-200">Reporter Draft</span>
+      </button>
+      <button onclick="setStep(6)" class="step-tab text-left p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition" id="tab-6">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 block font-mono">06. Publication</span>
+        <span class="font-medium text-slate-200">Cryptographic Chain</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- MAIN CANVAS & ARCHITECTURE VISUALIZATION -->
+  <main class="max-w-7xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT 8 COLUMNS: INTERACTIVE DIAGRAM -->
+    <div class="lg:col-span-8 flex flex-col gap-6">
+      
+      <!-- LAYER 1: CHAT CLIENT & HUMAN COLLABORATION -->
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 relative transition-all duration-300" id="card-layer-chat">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+            <span class="font-mono text-xs uppercase tracking-wider text-cyan-400 font-semibold">Layer 1: Enterprise Interface & Human-in-the-Loop</span>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">Switch Protocol · Mattermost Channel</span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-3">
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center human-node" id="node-lead">
+            <div class="w-10 h-10 mx-auto rounded-full bg-cyan-950 border border-cyan-500/50 flex items-center justify-center text-cyan-300 font-bold mb-1 shadow-inner">
+              AL
+            </div>
+            <div class="text-xs font-semibold text-white">@akshar (Lead)</div>
+            <div class="text-[10px] text-cyan-400 font-mono">Role: Sustainability Lead</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center human-node" id="node-priya">
+            <div class="w-10 h-10 mx-auto rounded-full bg-purple-950 border border-purple-500/50 flex items-center justify-center text-purple-300 font-bold mb-1 shadow-inner">
+              RM
+            </div>
+            <div class="text-xs font-semibold text-white">@richa (Priya)</div>
+            <div class="text-[10px] text-purple-400 font-mono">Site Manager (WH-2)</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center human-node" id="node-finance">
+            <div class="w-10 h-10 mx-auto rounded-full bg-amber-950 border border-amber-500/50 flex items-center justify-center text-amber-300 font-bold mb-1 shadow-inner">
+              UJ
+            </div>
+            <div class="text-xs font-semibold text-white">@ujjwal (Finance)</div>
+            <div class="text-[10px] text-amber-400 font-mono">Finance Approver</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center human-node" id="node-auditor">
+            <div class="w-10 h-10 mx-auto rounded-full bg-emerald-950 border border-emerald-500/50 flex items-center justify-center text-emerald-300 font-bold mb-1 shadow-inner">
+              PA
+            </div>
+            <div class="text-xs font-semibold text-white">@p3admin (Auditor)</div>
+            <div class="text-[10px] text-emerald-400 font-mono">External Auditor</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANIMATED CONNECTOR BUS (WebSockets) -->
+      <div class="relative py-1 flex items-center justify-center">
+        <svg class="w-full h-8" viewBox="0 0 800 32" fill="none">
+          <line x1="100" y1="0" x2="100" y2="32" stroke="#06b6d4" stroke-width="2" class="flowing-line"/>
+          <line x1="300" y1="0" x2="300" y2="32" stroke="#a855f7" stroke-width="2" class="flowing-line"/>
+          <line x1="500" y1="0" x2="500" y2="32" stroke="#f59e0b" stroke-width="2" class="flowing-line"/>
+          <line x1="700" y1="0" x2="700" y2="32" stroke="#10b981" stroke-width="2" class="flowing-line"/>
+          <text x="400" y="20" text-anchor="middle" fill="#64748b" font-family="Fira Code" font-size="10">4x DUPLEX WEBSOCKET SESSIONS · ASYNC DISPATCHER BUS</text>
+        </svg>
+      </div>
+
+      <!-- LAYER 2: 4 AUTONOMOUS SPECIALIZED AGENTS -->
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 relative transition-all duration-300" id="card-layer-agents">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></span>
+            <span class="font-mono text-xs uppercase tracking-wider text-purple-400 font-semibold">Layer 2: 4 Specialized Room Agents</span>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">Event-Driven · Deterministic Boundary</span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-3">
+          <!-- Carbon Room Orchestrator -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center agent-node transition-all duration-300 hover:scale-105" id="agent-orchestrator">
+            <div class="w-8 h-8 mx-auto rounded-lg bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-400 font-bold mb-1.5 shadow-md shadow-cyan-950">
+              ⚡
+            </div>
+            <div class="text-xs font-bold text-white">@carbon-room</div>
+            <div class="text-[10px] text-cyan-400 font-mono font-semibold">Orchestrator</div>
+            <div class="text-[10px] text-slate-400 mt-1 leading-tight">Controls close phases, plans & status board</div>
+          </div>
+
+          <!-- Collector -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center agent-node transition-all duration-300 hover:scale-105" id="agent-collector">
+            <div class="w-8 h-8 mx-auto rounded-lg bg-blue-950 border border-blue-400 flex items-center justify-center text-blue-400 font-bold mb-1.5 shadow-md shadow-blue-950">
+              📥
+            </div>
+            <div class="text-xs font-bold text-white">@collector</div>
+            <div class="text-[10px] text-blue-400 font-mono font-semibold">Ingestion Engine</div>
+            <div class="text-[10px] text-slate-400 mt-1 leading-tight">Harvests raw files, SHA-256 deduplication</div>
+          </div>
+
+          <!-- Watchdog -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center agent-node transition-all duration-300 hover:scale-105" id="agent-watchdog">
+            <div class="w-8 h-8 mx-auto rounded-lg bg-amber-950 border border-amber-400 flex items-center justify-center text-amber-400 font-bold mb-1.5 shadow-md shadow-amber-950">
+              🛡️
+            </div>
+            <div class="text-xs font-bold text-white">@watchdog</div>
+            <div class="text-[10px] text-amber-400 font-mono font-semibold">Audit & Rules</div>
+            <div class="text-[10px] text-slate-400 mt-1 leading-tight">Executes 7 rules, opens & closes gap threads</div>
+          </div>
+
+          <!-- Reporter -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center agent-node transition-all duration-300 hover:scale-105" id="agent-reporter">
+            <div class="w-8 h-8 mx-auto rounded-lg bg-emerald-950 border border-emerald-400 flex items-center justify-center text-emerald-400 font-bold mb-1.5 shadow-md shadow-emerald-950">
+              📊
+            </div>
+            <div class="text-xs font-bold text-white">@reporter</div>
+            <div class="text-[10px] text-emerald-400 font-mono font-semibold">Disclosure & Trace</div>
+            <div class="text-[10px] text-slate-400 mt-1 leading-tight">Drafts PDF/JSON, verifies audit chain</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANIMATED CONNECTOR BUS -->
+      <div class="relative py-1 flex items-center justify-center">
+        <svg class="w-full h-8" viewBox="0 0 800 32" fill="none">
+          <line x1="100" y1="0" x2="250" y2="32" stroke="#a855f7" stroke-width="2" class="flowing-line"/>
+          <line x1="300" y1="0" x2="350" y2="32" stroke="#3b82f6" stroke-width="2" class="flowing-line"/>
+          <line x1="500" y1="0" x2="450" y2="32" stroke="#f59e0b" stroke-width="2" class="flowing-line"/>
+          <line x1="700" y1="0" x2="550" y2="32" stroke="#10b981" stroke-width="2" class="flowing-line"/>
+          <text x="400" y="20" text-anchor="middle" fill="#64748b" font-family="Fira Code" font-size="10">PURE INTENT GRAMMAR · AUDIT CONTRACT BOUNDARY</text>
+        </svg>
+      </div>
+
+      <!-- LAYER 3: CORE BACKEND ENGINES -->
+      <div class="glass-card rounded-2xl p-5 border border-slate-800 relative transition-all duration-300" id="card-layer-core">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+            <span class="font-mono text-xs uppercase tracking-wider text-emerald-400 font-semibold">Layer 3: Zero-Hallucination Proof & Arithmetic Core</span>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">SQLite Ledger · Decimal Math · Factor Sets</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Proof Validator Card -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800" id="core-proof">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-cyan-300 font-mono">Proof Boundary</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">Byte-Verified</span>
+            </div>
+            <p class="text-[11px] text-slate-300">Rejects hallucinated numbers. Enforces exact verbatim text match from raw PDF/EML bytes.</p>
+            <div class="mt-2 text-[10px] font-mono text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-800">
+              <code>excerpt in normalized(page)</code>
+            </div>
+          </div>
+
+          <!-- Rules Engine Card -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800" id="core-rules">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-amber-300 font-mono">7 Deterministic Rules</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] bg-amber-950 text-amber-400 border border-amber-800 font-mono">R1 — R7</span>
+            </div>
+            <p class="text-[11px] text-slate-300">Period overlap (R4), Diesel invoice conflict (R2), Stale Factor check (R3), 10% Variance threshold (R5).</p>
+            <div class="mt-2 text-[10px] font-mono text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-800">
+              <code>gap_opened → thread root</code>
+            </div>
+          </div>
+
+          <!-- Factor Set & Ledger Card -->
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800" id="core-ledger">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-emerald-300 font-mono">Factor Lock & Chain</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono">91 Events Intact</span>
+            </div>
+            <p class="text-[11px] text-slate-300">Immutable factor locking (DEFRA 2026, eGRID 2023, Ember 2025). SHA-256 event chaining.</p>
+            <div class="mt-2 text-[10px] font-mono text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-800">
+              <code>H_n = SHA256(H_n-1 || event)</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT 4 COLUMNS: LIVE EXECUTION CONSOLE & JUDGE EXPLAINER -->
+    <div class="lg:col-span-4 flex flex-col gap-6">
+
+      <!-- CURRENT STEP EXPLANATION CARD -->
+      <div class="glass-card rounded-2xl p-5 border border-cyan-500/40 relative overflow-hidden">
+        <div class="absolute -right-12 -top-12 w-32 h-32 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between mb-3">
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wider uppercase bg-cyan-950 text-cyan-300 border border-cyan-500/30" id="badgeStep">
+            Step 1 of 6
+          </span>
+          <span class="text-xs text-slate-400 font-mono" id="timingStep">Rehearsal Time: 0–10s</span>
+        </div>
+
+        <h3 class="text-base font-bold text-white mb-2" id="stepTitle">Starting the October Close</h3>
+        <p class="text-xs text-slate-300 leading-relaxed mb-4" id="stepDescription">
+          The Sustainability Lead commands <code class="text-cyan-400 font-mono font-semibold">@carbon-room close October</code> in the room. The orchestrator generates a plan, transitions state to <code class="text-amber-400 font-mono font-semibold">COLLECTING</code>, and tasks <code class="text-blue-400 font-mono font-semibold">@collector</code>.
+        </p>
+
+        <!-- LIVE MESSAGE PREVIEW -->
+        <div class="rounded-xl bg-slate-950 p-3 border border-slate-800 mb-4 font-mono text-xs shadow-inner">
+          <div class="text-[10px] text-slate-500 mb-1 flex items-center justify-between">
+            <span>LIVE ROOM MESSAGE</span>
+            <span class="text-emerald-400" id="chatSender">@akshar (Lead)</span>
+          </div>
+          <div class="text-slate-200" id="chatMessage">
+            "@carbon-room close October"
+          </div>
+          <div class="text-[11px] text-cyan-400 mt-2 pt-2 border-t border-slate-800/80" id="chatReply">
+            ⚡ @carbon-room: "Starting October 2026 close (2026-10-v1)..."
+          </div>
+        </div>
+
+        <!-- TECH HIGHLIGHT FOR JUDGES -->
+        <div class="bg-cyan-950/30 border border-cyan-500/20 rounded-xl p-3">
+          <div class="text-[11px] font-bold text-cyan-400 flex items-center gap-1.5 mb-1">
+            <span>💡</span>
+            <span>Why This Wins (Judge Pitch):</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-normal" id="judgePitch">
+            Traditional AI attempts to compute greenhouse gas emissions inside the LLM prompt, leading to hallucinations. Audit.CO2 isolates the AI strictly to extraction; all calculations, rules, and factor matching are 100% deterministic code.
+          </p>
+        </div>
+      </div>
+
+      <!-- LIVE METRICS PANEL -->
+      <div class="glass-card rounded-2xl p-5 border border-slate-800">
+        <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold mb-3 flex items-center justify-between">
+          <span>Ledger State Tracker</span>
+          <span class="text-emerald-400 font-mono">SQLite (var/carbon.db)</span>
+        </h4>
+
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Verified Emissions</span>
+              <span class="font-mono font-bold text-white" id="metricVerified">0.0 tCO2e</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="barVerified" class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Coverage Percentage</span>
+              <span class="font-mono font-bold text-cyan-400" id="metricCoverage">0%</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="barCoverage" class="h-full bg-cyan-400 transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs">
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-mono">Verified Sources</div>
+              <div class="text-sm font-bold text-white mt-0.5" id="metricSources">0 / 4</div>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-mono">Audit Chain Events</div>
+              <div class="text-sm font-bold text-emerald-400 mt-0.5" id="metricEvents">91 Events</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ARCHITECTURE SPEC REFERENCES -->
+      <div class="glass-card rounded-2xl p-4 border border-slate-800 text-[11px] text-slate-400 space-y-1.5 font-mono">
+        <div class="text-slate-300 font-semibold mb-1">Engineering Stack Highlights:</div>
+        <div>• <span class="text-cyan-400">SPEC-08</span>: Full Async OpsClient + Websocket Resumption</div>
+        <div>• <span class="text-purple-400">SPEC-09B</span>: Cross-Agent Addressing Delegation</div>
+        <div>• <span class="text-amber-400">SPEC-13</span>: Multi-Threaded HITL Resolution Engine</div>
+        <div>• <span class="text-emerald-400">SPEC-14/18</span>: Real-Core Integration & Tamper Verification</div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    // DATA FOR THE 6 STEP WORKFLOW
+    const steps = [
+      {
+        step: 1,
+        title: "Close Initiation & Plan Generation",
+        timing: "Rehearsal Time: 0–10s",
+        desc: "Sustainability Lead starts the close. @carbon-room locks the factor set (FS-2026-10), transitions to COLLECTING, and signals @collector.",
+        sender: "@akshar (Lead)",
+        message: "@carbon-room close October",
+        reply: "⚡ @carbon-room: 'Starting October 2026 close (2026-10-v1). @collector Collect October 2026 for HQ, Warehouse-2, Data Centre EU-West.'",
+        pitch: "Human triggers work using natural team chat. The system coordinates across 4 agents using contract-locked models and persistent SQLite state.",
+        verified: "0.0 tCO2e",
+        coverage: "0%",
+        sources: "0 / 4",
+        events: "14 Events",
+        activeCards: ["card-layer-chat", "agent-orchestrator", "node-lead"],
+        glowColor: "cyan"
+      },
+      {
+        step: 2,
+        title: "Ingestion with Proof Boundary (Zero Hallucination)",
+        timing: "Rehearsal Time: 10–25s",
+        desc: "@collector harvests synthetic PDFs, EMLs, and cloud invoices. Every extracted number is checked by validate() against raw document text before entering the ledger.",
+        sender: "@collector (Collector)",
+        message: "System Trigger: collect(close_id='2026-10-v1')",
+        reply: "📥 @collector: 'All 5 2026-10 sources collected. Stored in content-addressable SHA-256 store.'",
+        pitch: "Evidence retention guarantee: If an AI model hallucinates a number that does not appear verbatim in the source file, validate() instantly rejects it.",
+        verified: "0.0 tCO2e",
+        coverage: "0%",
+        sources: "0 / 4",
+        events: "28 Events",
+        activeCards: ["card-layer-agents", "agent-collector", "core-proof"],
+        glowColor: "blue"
+      },
+      {
+        step: 3,
+        title: "Audit Engine Flags 4 Compliance Gaps",
+        timing: "Rehearsal Time: 25–55s",
+        desc: "@watchdog runs all 7 deterministic rules. It identifies 4 blockers: Period mismatch (G-3), Diesel conflict (G-1), Stale Factor (G-2), and 38% Variance (G-4), opening dedicated threads.",
+        sender: "@watchdog (Watchdog)",
+        message: "Rule Execution: R1 (Missing), R2 (Conflict), R3 (Stale), R4 (Period), R5 (Variance)",
+        reply: "🛡️ @watchdog: 'Opened 4 gap threads. Verified: 0.0 tCO2e · Excluded: 24.7 tCO2e · Coverage: 0%'",
+        pitch: "Instead of hiding data discrepancies, the system excludes unverified figures from corporate totals until an authorized human acts in the room.",
+        verified: "0.0 tCO2e",
+        coverage: "0%",
+        sources: "0 / 4",
+        events: "46 Events",
+        activeCards: ["card-layer-agents", "agent-watchdog", "core-rules"],
+        glowColor: "amber"
+      },
+      {
+        step: 4,
+        title: "Human-in-the-Loop (HITL) Thread Resolution",
+        timing: "Rehearsal Time: 55–75s",
+        desc: "Humans act in threads: Priya uploads the real Warehouse-2 bill; Lead picks Revision A for diesel, approves locked factor, and approves variance. Real-time recalculation fires.",
+        sender: "Human Team (@akshar, @richa)",
+        message: "Thread G-3: 'upload actual.pdf' | Thread G-1: 'pick A' | Threads G-2/G-4: 'approve'",
+        reply: "🛡️ @watchdog: 'Resolved. Ledger updated. Total moved 0.0 → 8.6 → 12.5 → 21.9 tCO2e (100% Coverage)'",
+        pitch: "Every approval is cryptographically tied to the user's Switch sender ID and role. No anonymous approvals; tamper-evident audit trail.",
+        verified: "21.9 tCO2e",
+        coverage: "100%",
+        sources: "4 / 4",
+        events: "78 Events",
+        activeCards: ["card-layer-chat", "card-layer-agents", "agent-watchdog", "core-ledger", "node-priya", "node-lead"],
+        glowColor: "purple"
+      },
+      {
+        step: 5,
+        title: "Legal & Regulatory Disclosure Draft",
+        timing: "Rehearsal Time: 75–85s",
+        desc: "@reporter drafts Draft v1 with mandatory carbon accounting disclosures: AI datacenter workload unverified flag, Scope 2 certificate-based disclaimer, and source tags.",
+        sender: "@akshar (Lead)",
+        message: "@reporter draft",
+        reply: "📊 @reporter: 'Draft v1 ready. Verified: 21.9 tCO2e. Compliance disclosures attached. 5 source tags assigned.'",
+        pitch: "Regulatory compliance guardrails ensure corporate sustainability reports never misclassify certificate-based clean energy or omit unverified cloud workloads.",
+        verified: "21.9 tCO2e",
+        coverage: "100%",
+        sources: "4 / 4",
+        events: "84 Events",
+        activeCards: ["card-layer-agents", "agent-reporter"],
+        glowColor: "emerald"
+      },
+      {
+        step: 6,
+        title: "Immutable Publication & Audit Chain Verification",
+        timing: "Rehearsal Time: 85–90s",
+        desc: "Lead publishes. The system outputs immutable HTML, PDF, Markdown & JSON reports. Auditor asks @reporter verify audit: 91 events verified intact.",
+        sender: "@akshar (Lead) & @p3admin (Auditor)",
+        message: "@carbon-room publish  |  @reporter verify audit",
+        reply: "⚡ @carbon-room: 'Published v1. Files: coverage.html, report.pdf' | 📊 @reporter: 'Audit chain intact: 91 events.'",
+        pitch: "The entire ledger can be mathematically recomputed from original evidence. Any manual tampering with the SQLite database invalidates the SHA-256 chain.",
+        verified: "21.9 tCO2e",
+        coverage: "100%",
+        sources: "4 / 4",
+        events: "91 Events",
+        activeCards: ["card-layer-chat", "card-layer-agents", "card-layer-core", "node-auditor", "core-ledger"],
+        glowColor: "emerald"
+      }
+    ];
+
+    let currentStep = 1;
+    let autoPlayInterval = null;
+
+    function updateUI() {
+      const data = steps[currentStep - 1];
+
+      // Update text
+      document.getElementById('stepCounter').innerText = `Step ${data.step} / 6`;
+      document.getElementById('badgeStep').innerText = `Step ${data.step} of 6`;
+      document.getElementById('timingStep').innerText = data.timing;
+      document.getElementById('stepTitle').innerText = data.title;
+      document.getElementById('stepDescription').innerText = data.desc;
+      document.getElementById('chatSender').innerText = data.sender;
+      document.getElementById('chatMessage').innerText = data.message;
+      document.getElementById('chatReply').innerText = data.reply;
+      document.getElementById('judgePitch').innerText = data.pitch;
+
+      // Update metrics
+      document.getElementById('metricVerified').innerText = data.verified;
+      document.getElementById('metricCoverage').innerText = data.coverage;
+      document.getElementById('metricSources').innerText = data.sources;
+      document.getElementById('metricEvents').innerText = data.events;
+
+      // Progress bars
+      const pct = parseInt(data.coverage) || 0;
+      document.getElementById('barCoverage').style.width = `${pct}%`;
+      document.getElementById('barVerified').style.width = pct === 100 ? '100%' : (pct > 0 ? '57%' : '0%');
+
+      // Update active tabs
+      for (let i = 1; i <= 6; i++) {
+        const tab = document.getElementById(`tab-${i}`);
+        if (i === currentStep) {
+          tab.classList.add('border-cyan-500', 'bg-cyan-950/40', 'glow-cyan');
+          tab.classList.remove('border-slate-800', 'bg-slate-900/60');
+        } else {
+          tab.classList.remove('border-cyan-500', 'bg-cyan-950/40', 'glow-cyan');
+          tab.classList.add('border-slate-800', 'bg-slate-900/60');
+        }
+      }
+
+      // Highlight active architectural cards
+      const allHighlightable = [
+        'card-layer-chat', 'card-layer-agents', 'card-layer-core',
+        'agent-orchestrator', 'agent-collector', 'agent-watchdog', 'agent-reporter',
+        'core-proof', 'core-rules', 'core-ledger',
+        'node-lead', 'node-priya', 'node-finance', 'node-auditor'
+      ];
+      allHighlightable.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.remove('border-cyan-400', 'border-purple-400', 'border-amber-400', 'border-emerald-400', 'glow-cyan', 'glow-purple', 'glow-amber', 'glow-emerald', 'scale-[1.02]');
+        }
+      });
+
+      data.activeCards.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.add(`border-${data.glowColor}-400`, `glow-${data.glowColor}`);
+          if (id.startsWith('agent-') || id.startsWith('node-')) {
+            el.classList.add('scale-[1.02]');
+          }
+        }
+      });
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      updateUI();
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+      currentStep = currentStep > 1 ? currentStep - 1 : 6;
+      updateUI();
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      currentStep = currentStep < 6 ? currentStep + 1 : 1;
+      updateUI();
+    });
+
+    // Auto play tour toggle
+    const autoBtn = document.getElementById('autoPlayBtn');
+    autoBtn.addEventListener('click', () => {
+      if (autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = null;
+        autoBtn.classList.remove('bg-emerald-500/40', 'border-emerald-400');
+        autoBtn.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span><span>Auto Tour</span>';
+      } else {
+        autoBtn.classList.add('bg-emerald-500/40', 'border-emerald-400');
+        autoBtn.innerHTML = '<span>⏸ Pause Tour</span>';
+        autoPlayInterval = setInterval(() => {
+          currentStep = currentStep < 6 ? currentStep + 1 : 1;
+          updateUI();
+        }, 4000);
+      }
+    });
+
+    // Initialize on load
+    updateUI();
+  </script>
+</body>
+</html>
+
