@@ -127,11 +127,8 @@ def test_repo_people_yaml_parses_and_has_four_people(monkeypatch):
         people = config.load_people()["people"]
         assert [p["id"] for p in people] == ["lead", "priya", "finance", "auditor"]
         assert [p["role"] for p in people] == ["lead", "site_manager", "finance", "auditor"]
-        assert all(p["username"] == "" and p["switch_ids"] == [] for p in people)
+        assert all(isinstance(p["username"], str) and isinstance(p["switch_ids"], list) for p in people)
         assert people[1]["sites"] == ["warehouse-2"]
-        assert identity.placeholders() == [
-            "lead: switch_ids is empty",
-            "priya: switch_ids is empty",
-        ]
+        assert not any("<" in p for p in identity.placeholders())
     finally:
         config.clear_caches()

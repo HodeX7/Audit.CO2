@@ -121,7 +121,12 @@ class OpsClient:
         json: dict | None = None,
         headers: dict | None = None,
     ) -> httpx.Response:
-        url = f"/agents/{self.agent_id}/ops/{path}" if not path.startswith('/') else path
+        if not path:
+            url = f"/agents/{self.agent_id}/ops"
+        elif path.startswith("/"):
+            url = path
+        else:
+            url = f"/agents/{self.agent_id}/ops/{path}"
         hdrs = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",

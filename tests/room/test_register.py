@@ -134,17 +134,50 @@ def test_first_run_registers_four_and_writes_env(tmp_path, capsys):
     assert "collector: registered" in capsys.readouterr().out
 
 
-def test_addressing_calls_use_agent_keys(tmp_path):
+def test_addressing_uses_another_agents_key(tmp_path):
     path = make_env(tmp_path)
     rec = Recorder()
     run(path, rec)
     calls = rec.posts("/ops/update_agent_detail")
     assert len(calls) == 4
-    for name, c in zip(AGENT_NAMES, calls, strict=True):
-        assert c["path"] == f"/agents/agent-{name}/ops/update_agent_detail"
-        assert c["auth"] == f"Bearer key-{name}-secret"
+    # carbon-room target is set by collector
+    c0 = calls[0]
+    assert c0["path"] == "/agents/agent-collector/ops/update_agent_detail"
+    assert c0["auth"] == "Bearer key-collector-secret"
+    assert c0["json"] == {"agent_id": "agent-carbon-room", "addressing": "anyone"}
+    assert c0["conn"] is None
+
+    # collector, watchdog, reporter are set by carbon-room
+    for name, c in zip(AGENT_NAMES[1:], calls[1:], strict=True):
+        assert c["path"] == "/agents/agent-carbon-room/ops/update_agent_detail"
+        assert c["auth"] == "Bearer key-carbon-room-secret"
         assert c["json"] == {"agent_id": f"agent-{name}", "addressing": "anyone"}
         assert c["conn"] is None
+
+
+def test_addressing_falls_back_when_carbon_room_missing(tmp_path, capsys):
+    path = make_env(tmp_path)
+    # Remove carbon-room key so it has to register, but make its registration return 409
+    lines = [line for line in path.read_text().splitlines() if not line.startswith("SWITCH_AGENT_CARBON_ROOM")]
+    path.write_text("\n".join(lines) + "\n")
+
+    def hook(req, body):
+        if body.get("name") == "carbon-room":
+            return httpx.Response(409, json={"detail": "already exists"})
+        return None
+
+    rec = Recorder(register_hook=hook)
+    run(path, rec)
+    calls = rec.posts("/ops/update_agent_detail")
+    # collector set by watchdog, watchdog set by collector, reporter set by collector
+    assert len(calls) == 3
+    targets = [c["json"]["agent_id"] for c in calls]
+    assert targets == ["agent-collector", "agent-watchdog", "agent-reporter"]
+    assert calls[0]["path"] == "/agents/agent-watchdog/ops/update_agent_detail"
+    assert calls[1]["path"] == "/agents/agent-collector/ops/update_agent_detail"
+    assert calls[2]["path"] == "/agents/agent-collector/ops/update_agent_detail"
+    out = capsys.readouterr().out
+    assert "carbon-room: addressing" not in out
 
 
 def test_second_run_skips_all(tmp_path, capsys):

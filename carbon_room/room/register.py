@@ -135,14 +135,30 @@ def _register(env: _Env, client: httpx.Client, server: str) -> None:
 
 def _set_addressing(env: _Env, client: httpx.Client, server: str) -> None:
     for name in AGENT_NAMES:
-        agent_id, key = _creds(env, name)
-        if not (agent_id and key):
+        target_id, _ = _creds(env, name)
+        if not target_id:
             continue
+
+        # Choose caller: carbon-room for others, collector for carbon-room, or first available
+        preferred = "collector" if name == "carbon-room" else "carbon-room"
+        caller_id, caller_key = _creds(env, preferred)
+        if not (caller_id and caller_key):
+            for candidate in AGENT_NAMES:
+                if candidate != name:
+                    cid, ckey = _creds(env, candidate)
+                    if cid and ckey:
+                        caller_id, caller_key = cid, ckey
+                        break
+
+        if not (caller_id and caller_key):
+            print(f"{name}: couldn't set addressing (no other agent to ask); {_ADDRESSING_HINT}")
+            continue
+
         try:
             response = client.post(
-                f"{server}/agents/{agent_id}/ops/update_agent_detail",
-                headers={"Authorization": f"Bearer {key}"},
-                json={"agent_id": agent_id, "addressing": "anyone"},
+                f"{server}/agents/{caller_id}/ops/update_agent_detail",
+                headers={"Authorization": f"Bearer {caller_key}"},
+                json={"agent_id": target_id, "addressing": "anyone"},
             )
         except httpx.TransportError:
             print(f"{name}: couldn't set addressing (no response); {_ADDRESSING_HINT}")
