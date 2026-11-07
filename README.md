@@ -1,4 +1,15 @@
-# Carbon Room
+# Audit.CO2 — Autonomous Multi-Agent Emissions Accounting
+
+> **WeMakeDevs "Flip the Switch" Hackathon** · **Track 01: Best Business Workflow**  
+> Powered by [Switch AI](https://switch.chat) · 4 Autonomous Agents · Zero-Hallucination Proof Boundary · 91-Event Cryptographic Audit Chain
+
+### 🏆 Hackathon Submission Deliverables
+- 🎬 **Video Script & Rehearsal Guide:** [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md)
+- 📊 **Presentation Slides (PDF):** [`Audit_CO2_Presentation.pdf`](Audit_CO2_Presentation.pdf)  ·  **PowerPoint:** [`Audit_CO2_Presentation.pptx`](Audit_CO2_Presentation.pptx)
+- 🌐 **Interactive Architecture Visualizer:** [`docs/architecture-demo.html`](docs/architecture-demo.html)
+- 📑 **Published Sample Report Suite:** [`out/2026-10/v1/coverage.html`](out/2026-10/v1/coverage.html) · [`out/2026-10/v1/report.pdf`](out/2026-10/v1/report.pdf)
+
+---
 
 ## What it is
 
