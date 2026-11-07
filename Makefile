@@ -42,7 +42,7 @@ reset-demo:
 
 test:
 	@echo "→ Running the test suite"
-	$(PY) -m pytest -q
+	PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 $(PY) -m pytest -q
 
 lint:
 	@echo "→ Running ruff on the P3 paths"
