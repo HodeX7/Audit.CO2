@@ -52,6 +52,8 @@ full repository checks. The synthetic expected result is checked with
 
 ## Running the demo close
 
+For the complete judge video script and timestamped narration, see [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
+
 Use the October 2026 fictional seed and a clean disposable demo ledger. The numbers are defined only in
 [data/seed/EXPECTED.md](data/seed/EXPECTED.md). Human actors must have their actual Switch sender ids in
 `config/people.yaml` or their mutation is refused as a guest.
@@ -110,7 +112,7 @@ The defaults are threads on (`CARBON_ROOM_THREADS=1`), inbox attachments, and fo
 
 ## Architecture
 
-The [architecture view](Carbon%20Room%20Architecture.html) provides the system overview.
+The [interactive architecture visualizer](docs/architecture-demo.html) and [architecture view](Carbon%20Room%20Architecture.html) provide the system overview. An animated, judge-facing walkthrough is available in `docs/architecture-demo.html`.
 
 1. Four Switch sockets feed one deduplicating room dispatcher.
 2. Accepted messages reach role-aware handlers with their Switch message ids.
