@@ -36,7 +36,7 @@
 
 ## 🎬 Screen Setup Checklist (Before Hitting Record)
 
-1. **Browser Tab 1:** `docs/architecture-demo.html` (Full screen, zoomed to 100% or 110% for crisp display). Ensure Step 1 is selected.
+1. **Browser Tab 1:** Live Visualizer at `https://hodex7.github.io/Audit.CO2/` (or local [`docs/architecture-demo.html`](docs/architecture-demo.html)) (Full screen, zoomed to 100% or 110% for crisp display). Ensure Step 1 is selected.
 2. **Browser Tab 2:** Mattermost Channel (`http://127.0.0.1:51547/switch/channels/emissions-reporting`). Make sure the completed October close run is visible and threads are readily expandable.
 3. **Screen Resolution:** 1920x1080 (1080p).
 4. **Audio:** Test microphone levels. Speak with energy, clarity, and authority.

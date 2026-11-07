@@ -6,7 +6,7 @@
 ### 🏆 Hackathon Submission Deliverables
 - 🎬 **Video Script & Rehearsal Guide:** [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md)
 - 📊 **Presentation Slides (PDF):** [`Audit_CO2_Presentation.pdf`](Audit_CO2_Presentation.pdf)  ·  **PowerPoint:** [`Audit_CO2_Presentation.pptx`](Audit_CO2_Presentation.pptx)
-- 🌐 **Interactive Architecture Visualizer:** [`docs/architecture-demo.html`](docs/architecture-demo.html)
+- 🌐 **Live Interactive Architecture Visualizer:** [https://hodex7.github.io/Audit.CO2/](https://hodex7.github.io/Audit.CO2/)  ·  Local: [`docs/architecture-demo.html`](docs/architecture-demo.html)
 - 📑 **Published Sample Report Suite:** [`out/2026-10/v1/coverage.html`](out/2026-10/v1/coverage.html) · [`out/2026-10/v1/report.pdf`](out/2026-10/v1/report.pdf)
 
 ---
