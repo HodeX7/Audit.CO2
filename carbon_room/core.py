@@ -58,7 +58,10 @@ def ingest_file(close_id, path, actor, chat_message_id, site=None):
 
 def calculate(close_id):
     """P2 implementation: calculate all applicable live claims."""
-    _unimplemented("P2", "P2-2.1")
+    from carbon_room.calc import run
+
+    with connect() as db:
+        return run.calculate(db, close_id)
 
 
 def check(close_id):
