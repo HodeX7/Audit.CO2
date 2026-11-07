@@ -308,7 +308,6 @@
           <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wider uppercase bg-cyan-950 text-cyan-300 border border-cyan-500/30" id="badgeStep">
             Step 1 of 6
           </span>
-          <span class="text-xs text-slate-400 font-mono" id="timingStep">Rehearsal Time: 0–10s</span>
         </div>
 
         <h3 class="text-base font-bold text-white mb-2" id="stepTitle">Starting the October Close</h3>
@@ -328,17 +327,6 @@
           <div class="text-[11px] text-cyan-400 mt-2 pt-2 border-t border-slate-800/80" id="chatReply">
             ⚡ @carbon-room: "Starting October 2026 close (2026-10-v1)..."
           </div>
-        </div>
-
-        <!-- TECH HIGHLIGHT FOR JUDGES -->
-        <div class="bg-cyan-950/30 border border-cyan-500/20 rounded-xl p-3">
-          <div class="text-[11px] font-bold text-cyan-400 flex items-center gap-1.5 mb-1">
-            <span>💡</span>
-            <span>Why This Wins (Judge Pitch):</span>
-          </div>
-          <p class="text-[11px] text-slate-300 leading-normal" id="judgePitch">
-            Traditional AI attempts to compute greenhouse gas emissions inside the LLM prompt, leading to hallucinations. Audit.CO2 isolates the AI strictly to extraction; all calculations, rules, and factor matching are 100% deterministic code.
-          </p>
         </div>
       </div>
 
@@ -506,13 +494,11 @@
       // Update text
       document.getElementById('stepCounter').innerText = `Step ${data.step} / 6`;
       document.getElementById('badgeStep').innerText = `Step ${data.step} of 6`;
-      document.getElementById('timingStep').innerText = data.timing;
       document.getElementById('stepTitle').innerText = data.title;
       document.getElementById('stepDescription').innerText = data.desc;
       document.getElementById('chatSender').innerText = data.sender;
       document.getElementById('chatMessage').innerText = data.message;
       document.getElementById('chatReply').innerText = data.reply;
-      document.getElementById('judgePitch').innerText = data.pitch;
 
       // Update metrics
       document.getElementById('metricVerified').innerText = data.verified;
