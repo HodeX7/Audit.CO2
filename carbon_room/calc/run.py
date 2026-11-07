@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import logging
-
 from carbon_room.actors import CALCULATOR
 from carbon_room.calc import factors
 from carbon_room.calc.calculator import compute
+from carbon_room.calc.datacentre import compute as compute_datacentre
 from carbon_room.ledger import ledger
 from carbon_room.models import Calculation, Claim
-
-log = logging.getLogger(__name__)
 
 
 def choose_factor(conn, close: dict, claim: Claim) -> dict:
@@ -24,34 +21,51 @@ def choose_factor(conn, close: dict, claim: Claim) -> dict:
         factor = ledger.get_factor(conn, claim.factor_id)
         factors.ensure_allowed(claim.site, claim.activity, factor)
         return factor
+    vendor_ref = claim.attributes.get("vendor_factor_ref")
+    if vendor_ref:
+        factor = factors.factor_from_ref(conn, vendor_ref)
+        factors.ensure_allowed(claim.site, claim.activity, factor)
+        return factor
     return factors.locked_factor(conn, close, claim.site, claim.activity)
 
 
 def calculate(conn, close_id: str) -> list[Calculation]:
-    """Calculate every live non-data-centre claim, both months, so the prior month can serve as a baseline.
+    """Calculate every live claim, including previous-month baselines.
 
     Safe to re-run: a claim whose factor, quantity and result are unchanged gets no new calculation and no event.
     """
     close = ledger.get_close(conn, close_id)
+    if close["phase"] == "PUBLISHED":
+        raise ValueError("published close cannot be recalculated; start a new version")
     if close["phase"] in ("OPEN", "COLLECTING"):
         ledger.set_phase(conn, close_id, "CALCULATING", CALCULATOR)
     results: list[Calculation] = []
     for claim in ledger.get_claims(conn, close_id):
-        if claim.activity == "dc_it_kwh":
-            log.warning("%s is a data-centre claim: not calculated here, it needs the data-centre calculation",
-                        claim.claim_id)
-            continue
         factor = choose_factor(conn, close, claim)
         if claim.factor_id != factor["factor_id"]:
-            ledger.set_factor(conn, claim.claim_id, factor["factor_id"], factor["version"], CALCULATOR,
-                              "factor chosen at calculation")
+            ledger.set_factor(
+                conn, claim.claim_id, factor["factor_id"], factor["version"], CALCULATOR, "factor chosen at calculation"
+            )
             claim = ledger.get_claim(conn, claim.claim_id)
-        fresh = compute(claim, factor)
-        latest = ledger.latest_calculation(conn, claim.claim_id)
-        unchanged = (latest is not None and latest.factor_id == fresh.factor_id
-                     and latest.activity_value == fresh.activity_value and latest.kgco2e == fresh.kgco2e)
-        if not unchanged:
-            ledger.add_calculation(conn, fresh)
-            latest = ledger.latest_calculation(conn, claim.claim_id)
-        results.append(latest)
+        candidates = compute_datacentre(claim, factor) if claim.activity == "dc_it_kwh" else [compute(claim, factor)]
+        for fresh in candidates:
+            latest = ledger.latest_calculation(conn, claim.claim_id, fresh.basis)
+            unchanged = latest is not None and all(
+                getattr(latest, field) == getattr(fresh, field)
+                for field in (
+                    "factor_id",
+                    "factor_version",
+                    "activity_value",
+                    "activity_unit",
+                    "factor_value",
+                    "factor_unit",
+                    "kgco2e",
+                    "formula",
+                    "basis",
+                )
+            )
+            if not unchanged:
+                ledger.add_calculation(conn, fresh)
+                latest = ledger.latest_calculation(conn, claim.claim_id, fresh.basis)
+            results.append(latest)
     return results

@@ -6,6 +6,11 @@ plan §6. Story ids in brackets refer to [P3-switch-room-and-demo.md](../P3-swit
 
 Tick a line on `main` after its PR merges. Feature PRs don't edit this file.
 
+**Local worktree update, 7 Nov:** S15, S17 and S18 now have implementation and offline tests on the unmerged
+`p2-spec-completion` worktree; their boxes remain unchecked under the merge rule above. The older P1/P2 blocker
+notes below describe historical `main` status, not this worktree. See `docs/STATUS.md` for current local results.
+Live Switch spikes, real person ids, rehearsal, clean-machine run, recording and submission remain unverified.
+
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · (cut) = drop first if late.
 
 **Deadlines:** README reproducible by Fri 6 Nov 12:00 PT · freeze Fri 6 Nov 17:00 PT · submit Sat 7 Nov 10:00 PT

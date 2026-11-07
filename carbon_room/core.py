@@ -7,10 +7,6 @@ from carbon_room.ledger import budget, connect, ledger
 from carbon_room.ledger.audit import verify_audit as verify_chain
 
 
-def _unimplemented(owner: str, story: str) -> None:
-    raise NotImplementedError(f"owner: {owner}, story {story}")
-
-
 def start_close(month, sites, factor_set, actor, chat_message_id):
     """P1 implementation: create a close and lock its factor set."""
     if len(month) != 7 or month[4] != "-":
@@ -66,32 +62,54 @@ def calculate(close_id):
 
 def check(close_id):
     """P2 implementation: apply rules and verification pass."""
-    _unimplemented("P2", "P2-3.9")
+    from carbon_room.checks import run
+
+    with connect() as db:
+        return run.check(db, close_id)
 
 
 def resolve(gap_id, action, actor, chat_message_id, payload):
     """P2 implementation: resolve a gap option and re-run checks."""
-    _unimplemented("P2", "P2-4.1")
+    from carbon_room.checks.resolve import apply
+
+    with connect() as db:
+        return apply(db, gap_id, action, actor, chat_message_id, payload)
 
 
 def summary(close_id):
     """P2 implementation: return a pure close summary."""
-    _unimplemented("P2", "P2-5.1")
+    from carbon_room.report.summary import build
+
+    with connect() as db:
+        return build(db, close_id)
 
 
 def draft_report(close_id):
     """P2 implementation: create a draft report and source tags."""
-    _unimplemented("P2", "P2-5.2")
+    from carbon_room.report.reporter import draft
+
+    with connect() as db:
+        return draft(db, close_id)
 
 
 def publish(close_id, actor, chat_message_id):
     """P2 implementation: publish an honest report through its role gate."""
-    _unimplemented("P2", "P2-5.3")
+    from carbon_room.models import NeedsRoomEvent
+    from carbon_room.report.publish import publish as publish_close
+
+    if actor.kind == "human" and not chat_message_id:
+        raise NeedsRoomEvent("publishing requires a Switch chat_message_id")
+
+    with connect() as db:
+        return publish_close(db, close_id, actor, chat_message_id)
 
 
 def trace(close_id, tag):
     """P2 implementation: recompute a source tag from the ledger."""
-    _unimplemented("P2", "P2-5.4")
+    from carbon_room.report.trace import lookup
+
+    with connect() as db:
+        return lookup(db, close_id, tag)
 
 
 def verify_audit(close_id):

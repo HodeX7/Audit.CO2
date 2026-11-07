@@ -2,6 +2,19 @@
 
 The active contract implementation lives in `carbon_room/`.
 
+## 2026-11-07 — Verified-status safety clarification
+
+- The team lead selected the safety invariant: a claim may be demoted from VERIFIED before publication if a new blocking finding or human rejection appears. Every status change is audited. A PUBLISHED close and its report remain immutable; later evidence starts a new close version. This reconciles the prior contradictory sentences in `00-CONTRACTS.md` without changing the frozen facade or SQLite schema.
+
+## 2026-11-06 — P2 safety clarification for team review
+
+- No frozen API signature or SQLite schema changes. A publish decision writes an explicit `report_published` audit
+  event with the close version, Switch message id and timestamp; the existing `published_*` close fields remain.
+- Internal hardening: gap uploads reject a wrong site/month/activity before P1 commits evidence; repeated `G-1` style
+  identifiers are scoped to the latest close by `core.resolve`; source blobs are verified and atomically written;
+  report files are staged before publication. These do not change the frozen facade signatures or schema.
+- The contradictory VERIFIED wording was resolved in the 2026-11-07 clarification above.
+
 ## 2026-11-06 — P2 calculation-read handoff
 
 - `ledger.latest_calculation(conn, claim_id, basis=...)` is now a public basis-filtered read. The permitted basis

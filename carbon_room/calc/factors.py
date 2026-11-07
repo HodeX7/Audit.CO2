@@ -5,12 +5,13 @@ from __future__ import annotations
 import csv
 import os
 import re
+from contextlib import closing
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from carbon_room import config
 from carbon_room.calc.units import KNOWN_FACTOR_UNITS
-from carbon_room.ledger import ledger
+from carbon_room.ledger import connect, init_db, ledger
 from carbon_room.models import NotFound
 
 COLUMNS = ("factor_id", "source", "version", "year", "activity", "geography", "value", "unit", "citation")
@@ -53,6 +54,14 @@ def read_csv(path: str | Path | None = None) -> list[dict]:
 def load(conn, path: str | Path | None = None) -> int:
     """Load the catalogue into the ledger. Repeat loads of identical rows are safe; changed rows are rejected."""
     return ledger.load_factors(conn, read_csv(path))
+
+
+def prepare_ledger() -> None:
+    """Initialize SQLite and load the configured immutable factors before a close starts."""
+    with closing(connect()) as conn:
+        with conn:
+            init_db(conn)
+            load(conn)
 
 
 def factor_set(name: str) -> dict[str, str]:

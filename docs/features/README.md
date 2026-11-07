@@ -1,4 +1,4 @@
-# Feature docs: Ingestion & Ledger (Ujjwal)
+# Feature docs: Carbon Room
 
 One file per shipped feature. Each one says **why** the feature exists, **how it is designed**, the
 **architecture** (diagram), the **decisions** behind it, a **code map**, and how it is **tested**.
@@ -7,6 +7,8 @@ One file per shipped feature. Each one says **why** the feature exists, **how it
 | --- | --- | --- |
 | Contract-compatible shared types | [contract-compatibility.md](contract-compatibility.md) | `carbon_room/models.py` |
 | Sourced synthetic reference fixtures | [reference-test-fixtures.md](reference-test-fixtures.md) | `tests/fixtures/emissions_reference/` |
+| P2 calculation-to-publication pipeline | [p2-close-pipeline.md](p2-close-pipeline.md) | `carbon_room/calc/`, `checks/`, `report/` |
+| P3 Switch runtime and room gate | [p3-switch-runtime.md](p3-switch-runtime.md) | `carbon_room/room/`, `carbon_room/agents/` |
 
 Decision log: [../DECISIONS.md](../DECISIONS.md). Current implementation status: [../STATUS.md](../STATUS.md).
 
