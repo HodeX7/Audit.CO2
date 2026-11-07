@@ -68,8 +68,9 @@ def _candidates(pages: list[str], kind: str, file_name: str, digest: str, close_
 
 
 def _validated_candidates(kind: str, pages: list[str], candidates: list[dict]) -> tuple[list[dict], str | None]:
-    """Return proof-backed candidates and a stable failure reason when none survive."""
+    """Return proof‑backed candidates and a stable failure reason when none survive."""
     if kind == "cloud_invoice":
+        # Cloud invoices may produce zero candidates – that’s a legitimate “no activity” case.
         return candidates, None if candidates else "cloud invoice has no activity record"
     valid, reasons = [], []
     for candidate in candidates:
@@ -78,7 +79,9 @@ def _validated_candidates(kind: str, pages: list[str], candidates: list[dict]) -
             valid.append(candidate)
         else:
             reasons.append(reason)
-    return valid, (reasons[0] if reasons else "no extractable activity found")
+    # When no candidates are accepted we surface the first validation reason;
+    # if validation never ran (empty candidates) we fall back to a generic message.
+    return valid, (reasons[0] if reasons else ("no extractable activity found" if not candidates else None))
 
 
 def ingest_file(conn: sqlite3.Connection, close_id: str, path: str | Path, actor: Actor, *, site: str | None = None,
