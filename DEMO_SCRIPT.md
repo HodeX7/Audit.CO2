@@ -1,8 +1,8 @@
 # Audit.CO2 — Hackathon Video Script & Presentation Guide
 **Event:** WeMakeDevs "Flip the Switch" Hackathon  
 **Track:** Best Business Workflow / Human-Agent Collaboration  
-**Presentation Strategy:** Interactive HTML Architecture Walkthrough (Steps 1–6) + Existing Mattermost Message Tour  
-**Target Video Duration:** 2:30 – 2:45 (Strictly under 3:00 hard limit)  
+**Presentation Strategy:** Interactive Architecture Walkthrough (Layers & Agent Roles) + Live Mattermost Collaboration Tour  
+**Target Video Duration:** 2:20 – 2:40 (Strictly under 3:00 hard limit)  
 **Deliverables:** Hosted on YouTube (Unlisted or Public) at 1080p / 60fps  
 
 ---
@@ -11,35 +11,35 @@
 
 | Winning Point | Hackathon Criterion | Where It Appears in Script |
 |---|---|---|
-| **Why Switch is Central & Indispensable** | Effective Use of Switch | **Intro (0:15) & Step 4/6**: Switch is NOT a passive chat UI; it is the **authoritative cryptographic and operational boundary**. The CLI intentionally has *no* publish or approve commands. Every action requires a verified Switch `chat_message_id` and role (`lead`, `site_manager`, `finance`). **Removing Switch kills the app** because without Switch, no report can be drafted, approved, or published. |
-| **4 Connected Specialized Agents** | Technical Complexity & Architecture | **Intro (0:25) & Steps 1–6**: 4 autonomous agents running over 4 concurrent duplex WebSockets: `@carbon-room` (Orchestrator), `@collector` (Ingestion), `@watchdog` (Audit & Rules), and `@reporter` (Disclosure & Trace). |
-| **Human-in-the-Loop (HITL) Workflow** | Best Business Workflow | **Step 4 (1:18) & Mattermost Tour**: Multi-threaded gap resolution where humans (`@akshar`, `@richa` / Priya) upload evidence and approve variances in dedicated threads, updating live emissions from 0.0 to 21.9 tCO2e. |
-| **Zero-Hallucination Proof Boundary** | AI Safety & Verifiability | **Step 2 (0:48)**: AI extractors are sandboxed; every extracted number must match verbatim bytes in raw source files or it is rejected. |
-| **Cryptographic Tamper-Evident Chain** | Engineering Depth | **Step 6 (1:45) & Mattermost Tour**: Deterministic decimal arithmetic, factor locking (`FS-2026-10`), and a 91-event SHA-256 hash-chained ledger in SQLite. |
-| **Real Impact** | Business Value | **Conclusion (2:35)**: Condenses 3 weeks of painful manual corporate carbon auditing into 3 minutes of mathematically verifiable multi-agent execution. |
+| **Why Switch is Central & Indispensable** | Effective Use of Switch | **Intro (0:15) & Throughout**: Switch is NOT just a chat UI; it is the **authoritative cryptographic and operational boundary**. The CLI intentionally has *no* publish or approve commands. Every action requires a verified Switch `chat_message_id` and role (`lead`, `site_manager`, `finance`). **Removing Switch kills the app** because without Switch, no report can be drafted, approved, or published. |
+| **4 Connected Specialized Agents** | Technical Complexity & Architecture | **Intro (0:25) & Step-by-Step**: 4 autonomous agents running over 4 concurrent duplex WebSockets: `@carbon-room` (Orchestrator), `@collector` (Ingestion), `@watchdog` (Audit & Rules), and `@reporter` (Disclosure & Trace). |
+| **Human-in-the-Loop Collaboration** | Best Business Workflow | **Step 4 & Mattermost Tour**: Multi-threaded gap resolution where human facility managers and leads collaborate with agents in dedicated threads to resolve evidence blockers. |
+| **Zero-Hallucination Proof Boundary** | AI Safety & Verifiability | **Step 2**: AI extractors are sandboxed; every extracted claim must match verbatim text bytes in raw source files or it is rejected. |
+| **Cryptographic Tamper-Evident Chain** | Engineering Depth | **Step 6 & Mattermost Tour**: Deterministic decimal arithmetic, factor set immutability, and a SHA-256 hash-chained ledger in SQLite. |
+| **Real-World Business Impact** | Business Value | **Conclusion**: Transforms weeks of fragmented enterprise spreadsheets into minutes of transparent, verifiable human-agent teamwork. |
 
 ---
 
-## ⏱️ Video Timeline & Screen Breakdown (Total: 2m 45s)
+## ⏱️ Video Timeline & Screen Breakdown (Total: ~2m 30s)
 
 ```
-0:00 ──────────────── 0:35 ──────────────── 1:55 ──────────────── 2:35 ────── 2:45
-  [1. Intro & Why Switch]  [2. HTML Walkthrough: 1 to 6]   [3. Mattermost Tour]  [4. Impact]
+0:00 ──────────────── 0:35 ──────────────── 1:45 ──────────────── 2:20 ────── 2:30
+  [1. Intro & Why Switch]  [2. Architecture & Agent Walkthrough]   [3. Mattermost Tour]  [4. Impact]
 ```
 
-- **0:00 – 0:35 (35s):** Architecture Overview on HTML page — Problem & Why Switch is Essential.
-- **0:35 – 1:55 (80s):** Step-by-Step Voiceover on HTML Page (Clicking Steps 1 to 6).
-- **1:55 – 2:35 (40s):** Tour of Existing Mattermost Messages (No typing required; scroll & expand threads).
-- **2:35 – 2:48 (13s):** Closing Pitch & Business Impact.
+- **0:00 – 0:35 (35s):** Architecture Overview — The Problem & Why Switch is the Core Backbone.
+- **0:35 – 1:45 (70s):** Architecture & Agent Roles Walkthrough (Stepping through 1 to 6 on the HTML Visualizer).
+- **1:45 – 2:20 (35s):** Mattermost Live Tour (Showcasing Real Human-Agent Collaboration in Threads).
+- **2:20 – 2:35 (15s):** Closing Pitch & Business Impact.
 
 ---
 
 ## 🎬 Screen Setup Checklist (Before Hitting Record)
 
-1. **Browser Tab 1:** Live Visualizer at `https://hodex7.github.io/Audit.CO2/` (or local [`docs/architecture-demo.html`](docs/architecture-demo.html)) (Full screen, zoomed to 100% or 110% for crisp display). Ensure Step 1 is selected.
-2. **Browser Tab 2:** Mattermost Channel (`http://127.0.0.1:51547/switch/channels/emissions-reporting`). Make sure the completed October close run is visible and threads are readily expandable.
+1. **Browser Tab 1:** Live Architecture Visualizer at `https://hodex7.github.io/Audit.CO2/` (Full screen, zoomed to 100% or 110%). Start on **Step 1**.
+2. **Browser Tab 2:** Mattermost Channel (`http://127.0.0.1:51547/switch/channels/emissions-reporting`). Keep the completed run ready so you can scroll and expand threads smoothly.
 3. **Screen Resolution:** 1920x1080 (1080p).
-4. **Audio:** Test microphone levels. Speak with energy, clarity, and authority.
+4. **Audio:** Speak with clear energy, confidence, and authority.
 
 ---
 
@@ -48,138 +48,136 @@
 ---
 
 ### [0:00 – 0:35] Act I: Introduction & Why Switch is Indispensable
-**Screen:** Show `docs/architecture-demo.html` in browser. Mouse hovers over the 3 architecture layers (Chat Interface $\to$ 4 Specialized Agents $\to$ Core Ledger).
+
+**Screen:** Display the Architecture Visualizer at `https://hodex7.github.io/Audit.CO2/`. Mouse hovers across the 3 architecture layers (Chat Interface $\to$ 4 Specialized Agents $\to$ Core Ledger).
 
 > **Voiceover (0:00 – 0:15):**  
-> *"Every enterprise today faces strict CSRD and SEC emissions reporting mandates. Yet, corporate carbon accounting takes weeks of manual spreadsheet wrangling. And when companies try generic LLMs, disaster strikes: black-box models hallucinate emissions numbers, leading to massive greenwashing penalties.*  
+> *"Every enterprise today faces stringent emissions reporting mandates. Yet corporate carbon accounting remains trapped in weeks of fragmented spreadsheets and disconnected facility teams. When companies try generic generative AI, black-box models hallucinate emissions data, exposing organizations to severe greenwashing penalties.*  
 >  
 > *This is **Audit.CO2**—an autonomous multi-agent carbon accounting platform powered by **Switch**.*  
 
 **Screen:** Point cursor to **Layer 1 (Switch Protocol)** and **Layer 2 (4 Room Agents)**.
 
 > **Voiceover (0:15 – 0:35):**  
-> *Now, why is Switch central here? Switch is **not** just a passive chat UI or notification bot. In Audit.CO2, Switch is the **authoritative execution and governance boundary**.*  
+> *Now, why is Switch central to this architecture? Switch is **not** an optional chat wrapper or notification bot. In Audit.CO2, Switch is the **authoritative governance and execution boundary**.*  
 >  
-> *Our CLI intentionally has **zero** publish or approve commands. By architectural design, every document upload, factor approval, and report publication requires an authoritative Switch `chat_message_id` and verified role-based identity.*  
+> *Our system intentionally has **no** standalone CLI commands to publish reports or approve data. By architectural design, every document upload, factor resolution, and publication requires an authoritative Switch message ID and verified role identity.*  
 >  
-> ***Removing Switch kills the application*** *— because without Switch, the chain of custody breaks and the system mathematically refuses to publish.  
+> ***Removing Switch kills the application*** *— because without Switch, the chain of custody breaks and the system mathematically refuses to publish.*  
 >  
-> Let's see how our four specialized agents collaborate with human experts across the 6-step monthly close."*
+> *Let's see how our four specialized agents collaborate with human stakeholders to complete a full enterprise close."*
 
 ---
 
-### [0:35 – 1:55] Act II: Interactive Architecture Walkthrough (Steps 1 to 6)
+### [0:35 – 1:45] Act II: Architecture & Agent Roles Walkthrough (Steps 1 to 6)
 
-#### Step 1: Close Initiation [0:35 – 0:48]
-**Screen Action:** Click **Step 1: Initiation** tab (or **Next Step →**). The Orchestrator card glows cyan. Point to the Ledger Tracker on the right showing `Verified: 0.0 tCO2e (0% Coverage)`.
+#### Step 1: Close Initiation & Orchestration [0:35 – 0:45]
+**Screen Action:** Click **Step 1: Initiation** tab (or **Next Step →**). The Orchestrator card glows cyan.
 
 > **Voiceover:**  
-> *"In **Step 1**, Sustainability Lead `@akshar` calls `@carbon-room close October`.*  
+> *"In **Step 1**, the Sustainability Lead triggers the close in the room.*  
 >  
-> *The orchestrator immediately locks emission factor set `FS-2026-10`, transitions the room state to `COLLECTING`, and dispatches `@collector`.*  
+> *Our Orchestrator agent, `@carbon-room`, takes charge. It locks the regulatory emissions factor set to prevent retroactive tampering, advances the close state machine, and orchestrates task hand-offs to our downstream agents.*  
 >  
-> *Notice our ledger tracker on the right: corporate verified emissions start strictly at **0.0 tCO2e**."*
+> *Notice our ledger architecture: unverified claims are strictly quarantined, ensuring unvetted numbers never enter corporate totals."*
 
 ---
 
-#### Step 2: Proof Boundary & Ingestion [0:48 – 1:02]
+#### Step 2: Ingestion & Zero-Hallucination Proof Boundary [0:45 – 0:58]
 **Screen Action:** Click **Step 2: Collection** tab. The Ingestion Engine and Proof Boundary cards glow blue.
 
 > **Voiceover:**  
-> *"In **Step 2**, `@collector` ingests raw PDF invoices, emails, and cloud bills into content-addressable storage.*  
+> *"In **Step 2**, our Ingestion agent, `@collector`, harvests raw evidence across utility PDFs, emails, and cloud billing records into content-addressable storage.*  
 >  
-> *Here is our first AI safety breakthrough: the **Zero-Hallucination Proof Boundary**. LLMs extract candidate numbers, but a deterministic byte-validator verifies that every extracted figure matches verbatim in the raw document text. If an AI hallucinates a number, it is instantly rejected before touching the database."*
+> *Here is our core AI safety innovation: the **Zero-Hallucination Proof Boundary**. While AI models assist with extraction, an automated byte-validator enforces that every extracted claim must match verbatim text in the source document. If an AI hallucinates, the proof boundary catches and rejects it before it can ever touch the ledger."*
 
 ---
 
-#### Step 3: Audit Engine & 7 Deterministic Rules [1:02 – 1:18]
+#### Step 3: Audit Engine & Deterministic Rules [0:58 – 1:10]
 **Screen Action:** Click **Step 3: Audit Engine** tab. The Watchdog and 7 Rules cards glow amber.
 
 > **Voiceover:**  
-> *"In **Step 3**, `@watchdog` runs all 7 deterministic GHG compliance rules.*  
+> *"In **Step 3**, our Compliance agent, `@watchdog`, evaluates all data against deterministic greenhouse gas accounting rules.*  
 >  
-> *It identifies four critical blockers: a period mismatch on Warehouse-2, conflicting diesel invoices, a stale grid factor, and a 38% electricity surge.  
+> *Instead of silently guessing or averaging discrepancies, Watchdog flags real-world compliance traps: billing period mismatches, conflicting vendor invoices, stale grid factors, and consumption spikes.*  
 >  
-> Instead of quietly guessing or averaging, Watchdog quarantines **24.7 tCO2e** of unverified data, keeps verified emissions at zero, and automatically opens four dedicated resolution threads in Switch."*
+> *It isolates these issues, excludes unverified figures from the close, and automatically spins out dedicated resolution threads in Switch."*
 
 ---
 
-#### Step 4: Human-in-the-Loop (HITL) Thread Resolution [1:18 – 1:35]
-**Screen Action:** Click **Step 4: HITL** tab. Human nodes (`@akshar`, `@richa`) and Watchdog glow purple. Point to the Ledger Tracker jumping to `21.9 tCO2e` (100% Coverage).
+#### Step 4: Human-in-the-Loop Thread Resolution [1:10 – 1:24]
+**Screen Action:** Click **Step 4: HITL** tab. Human nodes (`@akshar`, `@richa`) and Watchdog glow purple.
 
 > **Voiceover:**  
-> *"In **Step 4**, the power of Switch shines. Humans and agents collaborate inside dedicated threads.*  
+> *"In **Step 4**, the true power of human-agent collaboration through Switch comes alive.*  
 >  
-> *Priya, our site manager, uploads the actual Warehouse-2 invoice in thread G-3. The Lead picks Revision A for diesel in G-1, approves the locked factor in G-2, and approves the variance in G-4.*  
+> *Rather than overwhelming the main channel, stakeholders collaborate directly inside dedicated threads: our Site Manager uploads the corrected facility bill, while the Lead and Finance review vendor conflicts and approve factor overrides.*  
 >  
-> *As each thread resolves, Watchdog recalculates the ledger in real-time. Verified emissions move dynamically from 0 to 8.6, to 12.5, reaching exactly **21.9 tCO2e** with 100% verified coverage."*
+> *As humans resolve each issue, Watchdog dynamically recalculates corporate totals in real-time—anchoring every human action to their authenticated Switch identity."*
 
 ---
 
-#### Step 5: Regulatory Compliance & Disclosure Draft [1:35 – 1:45]
+#### Step 5: Regulatory Compliance & Disclosure Draft [1:24 – 1:35]
 **Screen Action:** Click **Step 5: Disclosure** tab. The Reporter card glows emerald.
 
 > **Voiceover:**  
-> *"In **Step 5**, the Lead requests `@reporter draft`.*  
+> *"In **Step 5**, our Disclosure agent, `@reporter`, compiles the audit-ready disclosure draft.*  
 >  
-> *Reporter compiles Draft v1 with mandatory CSRD disclosures: separating certificate-based clean energy and explicitly flagging unverified AI datacenter workloads—preventing corporate greenwashing penalties."*
+> *It applies strict regulatory guardrails: separating market-based clean energy certificates from physical grid emissions and explicitly flagging unverified cloud AI workloads—safeguarding the company against greenwashing liability."*
 
 ---
 
-#### Step 6: Immutable Publication & 91-Event Audit Chain [1:45 – 1:55]
-**Screen Action:** Click **Step 6: Publication** tab. The entire bottom layer and Auditor node glow emerald. Point to `91 Events Intact`.
+#### Step 6: Immutable Publication & Cryptographic Audit Chain [1:35 – 1:45]
+**Screen Action:** Click **Step 6: Publication** tab. The bottom ledger layer and Auditor node glow emerald.
 
 > **Voiceover:**  
-> *"Finally, in **Step 6**, the Lead publishes. Immutable PDF, JSON, and HTML reports are generated.*  
+> *"Finally, in **Step 6**, the Lead authorizes publication, generating immutable PDF, JSON, and web reports.*  
 >  
-> *External Auditor `@p3admin` asks `@reporter verify audit`—and the system cryptographically verifies all **91 SHA-256 chained events** in SQLite. If anyone tampers with a single byte in the database, the cryptographic hash tree fails instantly."*
+> *Our External Auditor can invoke `@reporter` at any time to inspect full mathematical lineage and verify the cryptographic SHA-256 event chain in our SQLite ledger. If anyone tampers with a single record, the cryptographic hash tree fails immediately."*
 
 ---
 
-### [1:55 – 2:35] Act III: Live Mattermost Tour (Existing Execution Messages)
+### [1:45 – 2:20] Act III: Live Mattermost Tour (Human-Agent Teamwork in Action)
 
 **Screen Action:** Switch browser tab to Mattermost channel `http://127.0.0.1:51547/switch/channels/emissions-reporting`.  
-Smoothly scroll through the existing message history.
+Smoothly scroll through the channel to show the real workspace collaboration.
 
-> **Voiceover (1:55 – 2:10):**  
-> *"Now let's see these exact messages live in our Switch Mattermost channel.*  
+> **Voiceover (1:45 – 2:00):**  
+> *"Now let's see how this collaboration actually feels inside our Switch Mattermost channel.*  
 >  
-> *Here is `@akshar` starting the close, and `@carbon-room` locking factor set `FS-2026-10`.*  
-> *Below that, `@collector` posts the harvested batch of 5 source documents.*  
-> *And right here is `@watchdog` declaring the four compliance gaps, holding corporate emissions at 0.0 tCO2e."*
+> *Here, the Sustainability Lead kicks off the close with `@carbon-room`, and the orchestrator acknowledges by locking factor versions.*  
+> *`@collector` confirms the ingestion of multi-facility evidence.*  
+> *And right below, `@watchdog` posts the actionable compliance gaps, keeping our channel transparent and focused."*
 
-**Screen Action:** Click on the thread icon for **G-3** or scroll to show the threaded interactions:
+**Screen Action:** Click open the thread drawer (e.g. Gap 3 or Gap 1) to show the threaded conversation:
 
-> **Voiceover (2:10 – 2:25):**  
-> *"Looking into the threads: here is Priya uploading the actual Warehouse-2 electricity bill, resolving Gap 3.*  
-> *In Gap 1, the Lead replied `pick A`. In G-2 and G-4, the Lead replied `approve`.*  
->  
-> *And look at Watchdog's live update post: verified emissions cleanly updated to **21.9 tCO2e** with 100% coverage."*
+> **Voiceover (2:00 – 2:12):**  
+> *"Inside the threads, you can see human-agent teamwork at work: Priya, our facility manager, uploads the correct bill right inside the thread, and Watchdog verifies it on the spot.*  
+> *In neighboring threads, the Lead resolves supplier invoice conflicts and confirms variance approvals.*  
+> *Notice how cleanly threads keep the main channel uncluttered while maintaining full context."*
 
 **Screen Action:** Scroll down to the final messages at the bottom:
 
-> **Voiceover (2:25 – 2:35):**  
-> *"At the bottom, we see `@reporter draft`, `@carbon-room publish` outputting the final signed report artifacts, and when we ask `@reporter trace S-001`, it outputs the exact mathematical lineage and raw document excerpt.  
-> And `@reporter verify audit` confirms all **91 events** in the cryptographic chain are intact."*
+> **Voiceover (2:12 – 2:20):**  
+> *"At the bottom, `@reporter` drafts the disclosure and `@carbon-room` publishes the signed reporting suite.*  
+> *Anyone on the team can ask `@reporter trace` for instant mathematical lineage, or `@reporter verify audit` to validate the tamper-evident cryptographic chain."*
 
 ---
 
-### [2:35 – 2:48] Act IV: Impact & Winning Conclusion
+### [2:20 – 2:35] Act IV: Business Impact & Conclusion
 
-**Screen Action:** Switch back to `docs/architecture-demo.html` or display the final summary view.
+**Screen Action:** Switch back to `https://hodex7.github.io/Audit.CO2/` or show the final summary view.
 
 > **Voiceover:**  
-> *"Audit.CO2 reduces corporate emissions auditing from **three weeks of spreadsheet chaos to three minutes of verifiable multi-agent execution**.*  
+> *"Audit.CO2 transforms corporate carbon accounting from **weeks of spreadsheet chaos into minutes of transparent, verifiable human-agent collaboration**.*  
 >  
-> *Switch makes this possible by providing the trusted human-agent communication bus and cryptographic governance boundary that enterprise compliance demands.*  
+> *Switch makes this possible by providing the trusted communication bus, role-based identity, and cryptographic governance boundary that enterprise compliance demands.*  
 >  
 > *Flip the Switch on carbon accounting. Thank you!"*
 
 ---
 
-## 💡 Quick Tips for the Live Recording
-
-1. **Pacing:** Keep a steady, confident pace. Don't rush, but don't pause unnecessarily. The script is timed at ~140 words per minute, easily fitting within 2 minutes 45 seconds.
-2. **Cursor Guidance:** When you talk about an agent or card (e.g. `@watchdog`, Proof Boundary, 91 Events), hover your mouse over it briefly to draw the judge's eyes.
-3. **No Live Typing Risk:** Because you are presenting the interactive architecture diagram and touring the already completed live Mattermost thread run, there is **zero risk of network delay, typo, or CLI failure** during the recording.
-4. **YouTube Settings:** Upload as **Unlisted** (or Public), title it *"Audit.CO2 — Autonomous Multi-Agent Emissions Accounting on Switch (WeMakeDevs Hackathon)"*, and include the repository link (`https://github.com/HodeX7/Audit.CO2`) in the description.
+## 💡 Key Reminders for the Recording
+1. **Focus on Roles & Architecture:** Keep the emphasis on *what the agents are doing* (orchestrating, ingesting with proof boundaries, auditing against rules, disclosing with guardrails) and *how humans collaborate via Switch*.
+2. **Smooth Transitions:** Move smoothly from the architecture diagram tabs (1 to 6) to the Mattermost channel.
+3. **Pacing:** At ~135 words per minute, this script clocks in at **2 minutes 25 seconds**—leaving plenty of breathing room well under the 3-minute limit.
