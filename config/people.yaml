@@ -4,7 +4,36 @@
 # A sender who isn't listed is a guest: they can ask questions but can't resolve, approve or publish.
 # make doctor fails until lead and priya have switch_ids.
 people:
-  - { id: lead,    name: "Sustainability Lead", role: lead,         username: "", switch_ids: [] }
-  - { id: priya,   name: "Priya",               role: site_manager, username: "", sites: [warehouse-2], switch_ids: [] }
-  - { id: finance, name: "Finance Approver",    role: finance,      username: "", switch_ids: [] }
-  - { id: auditor, name: "External Auditor",    role: auditor,      username: "", switch_ids: [] }
+  - id: lead
+    name: "Sustainability Lead"
+    role: lead
+    username: akshar
+    switch_ids:
+      - "@switch-mattermost-ee08e984-d644-4082-af63-71a4118fbdfb-akshar:localhost"
+      - "0b5c1c74-dc0a-4095-b440-5c7e29362e00"
+      - akshar
+  - id: priya
+    name: "Priya"
+    role: site_manager
+    username: richa
+    sites: [warehouse-2]
+    switch_ids:
+      - "@switch-mattermost-ee08e984-d644-4082-af63-71a4118fbdfb-richa:localhost"
+      - "874ac8b6-bebd-4f0d-bb77-20c315c0a21f"
+      - richa
+  - id: finance
+    name: "Finance Approver"
+    role: finance
+    username: ujjwal
+    switch_ids:
+      - "@switch-mattermost-ee08e984-d644-4082-af63-71a4118fbdfb-ujjwal:localhost"
+      - "737147e1-3184-4183-ba29-f3a04ec7e2a5"
+      - ujjwal
+  - id: auditor
+    name: "External Auditor"
+    role: auditor
+    username: p3admin
+    switch_ids:
+      - "@switch-mattermost-ee08e984-d644-4082-af63-71a4118fbdfb-p3admin:localhost"
+      - "9d1ad892-5478-483a-bd73-f9df850c8840"
+      - p3admin
