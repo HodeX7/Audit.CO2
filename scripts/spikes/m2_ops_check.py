@@ -26,8 +26,10 @@ OUT = Path(sys.argv[1])
 env = dotenv_values(".env")
 SERVER = env["SWITCH_SERVER"].rstrip("/")
 ROOM = env["SWITCH_ROOM_ID"]
-CREDS = {n: (env[f"SWITCH_AGENT_{n.upper().replace('-', '_')}_ID"], env[f"SWITCH_AGENT_{n.upper().replace('-', '_')}_KEY"])
-         for n in ("carbon-room", "collector", "watchdog", "reporter")}
+CREDS = {
+    n: (env[f"SWITCH_AGENT_{n.upper().replace('-', '_')}_ID"], env[f"SWITCH_AGENT_{n.upper().replace('-', '_')}_KEY"])
+    for n in ("carbon-room", "collector", "watchdog", "reporter")
+}
 SECRETS = [k for _, k in CREDS.values()] + [env.get("SWITCH_REGISTRATION_KEY") or "x" * 40]
 
 
@@ -69,7 +71,9 @@ class Sock:
                 if seq is not None:
                     self.cursor = max(self.cursor, seq)
                 self.frames.append({"t": time.time(), "raw": f})
-                if kind == "connection_state" or (isinstance(f.get("data"), dict) and f["data"].get("type") == "connection_state"):
+                if kind == "connection_state" or (
+                    isinstance(f.get("data"), dict) and f["data"].get("type") == "connection_state"
+                ):
                     self.ready.set()
 
 
@@ -104,13 +108,17 @@ async def main():
             st, body = await op(cr, "post_message", {"body": "[spike S1] root message, please ignore"})
         root_id = (body.get("result") or {}).get("event_id") if isinstance(body, dict) else None
         results["root_event_id"] = root_id
-        st, body = await op(cr, "post_message", {"body": "[spike S1] threaded reply, please ignore", "thread_id": root_id})
+        st, body = await op(
+            cr, "post_message", {"body": "[spike S1] threaded reply, please ignore", "thread_id": root_id}
+        )
         reply_id = (body.get("result") or {}).get("event_id") if isinstance(body, dict) else None
         results["reply_event_id"] = reply_id
         await asyncio.sleep(2)
 
         # targeted message to watchdog
-        await op(cr, "send_targeted_message", {"body": "[spike] targeted hello, please ignore", "target_names": ["watchdog"]})
+        await op(
+            cr, "send_targeted_message", {"body": "[spike] targeted hello, please ignore", "target_names": ["watchdog"]}
+        )
         await asyncio.sleep(2)
 
         # read_context shape
@@ -119,12 +127,22 @@ async def main():
 
         # S6 docs + connect_to_room payload documents
         name = f"spike-board-{int(time.time())}"
-        st, created = await op(cr, "create_room_document", {"name": name, "description": "spike", "instructions": "spike, ignore", "content": "# spike\nv1"})
+        st, created = await op(
+            cr,
+            "create_room_document",
+            {"name": name, "description": "spike", "instructions": "spike, ignore", "content": "# spike\nv1"},
+        )
         doc_id = (created.get("result") or {}).get("document_id") if isinstance(created, dict) else None
-        st, dup = await op(cr, "create_room_document", {"name": name, "description": "spike", "instructions": "spike", "content": "dup"})
+        st, dup = await op(
+            cr,
+            "create_room_document",
+            {"name": name, "description": "spike", "instructions": "spike", "content": "dup"},
+        )
         if doc_id:
             await op(cr, "update_room_document", {"document_id": doc_id, "content": "# spike\nv2"})
-        st, conn_payload = await op(cr, "connect_to_room", {"room_id": ROOM, "include_general_instructions": False})
+        st, conn_payload = await op(
+            cr, "connect_to_room", {"room_id": ROOM, "include_general_instructions": False}
+        )
         if isinstance(conn_payload, dict):
             res = conn_payload.get("result") or {}
             results["connect_documents"] = res.get("documents")
@@ -133,7 +151,8 @@ async def main():
         if doc_id:
             await op(cr, "delete_room_document", {"document_id": doc_id})
 
-        # addressing: owner-only, never yourself -> try carbon-room setting the other three, collector setting carbon-room
+        # Addressing: owner-only, never yourself. Carbon-room sets the other three;
+        # collector sets carbon-room.
         col = Sock("collector", "addressed")
         for target in ("collector", "watchdog", "reporter"):
             await op(cr, "update_agent_detail", {"agent_id": CREDS[target][0], "addressing": "anyone"}, conn=False)

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Carbon Room coverage</title><style>
+* {{ box-sizing: border-box; }} body {{ margin: 0; background: #081827; color: #eaf8f3; font: 28px system-ui, sans-serif; }}
+main {{ width: 1920px; min-height: 1080px; padding: 72px; }} h1 {{ font-size: 60px; margin: 0 0 24px; }}
+.metrics {{ display: flex; gap: 24px; margin: 36px 0; }} .metric, .card {{ background: #123447; border: 1px solid #2b6673; border-radius: 22px; padding: 30px; }}
+.metric {{ flex: 1; }} .metric strong {{ display: block; color: #8ee9bd; font-size: 56px; }} .grid {{ display: flex; flex-wrap: wrap; gap: 18px; }}
+.card {{ width: 290px; font-size: 20px; }} .card strong, .card small {{ display: block; margin-top: 12px; }}
+.foot {{ margin-top: 36px; font-size: 20px; color: #b0d7d4; }}
+</style></head><body><main><h1>{close_id} — coverage</h1>
+<div class="metrics"><div class="metric">Emissions coverage<strong>{coverage}%</strong></div>
+<div class="metric">Source coverage<strong>{source_coverage}</strong></div>
+<div class="metric">Verified only<strong>{verified} t</strong></div></div>
+<p>Excluded (unverified): {excluded} tCO2e · Open gaps: {gap_count}</p>
+<div class="grid">{cards}</div><div class="foot">Data centre: {dc}</div></main></body></html>

@@ -138,7 +138,7 @@ def test_room_id_missing(base):
     base.env["SWITCH_ROOM_ID"] = " "
     c = go(base)[3]
     assert not c.ok
-    assert c.fix == ("Create the october-close room and put its id in .env as SWITCH_ROOM_ID "
+    assert c.fix == ("Create the emissions-reporting room and put its id in .env as SWITCH_ROOM_ID "
                      "(docs/setup-switch.md).")
 
 

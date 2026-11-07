@@ -136,6 +136,13 @@ def get_close(conn, close_id) -> dict:
     return value
 
 
+def _mutable_close(conn, close_id) -> sqlite3.Row:
+    close = _close_or_raise(conn, close_id)
+    if close["phase"] == "PUBLISHED":
+        raise NotAllowed(f"published close {close_id} is immutable; start a new version")
+    return close
+
+
 def latest_close(conn) -> str | None:
     row = conn.execute("SELECT close_id FROM closes ORDER BY month DESC, version DESC LIMIT 1").fetchone()
     return row["close_id"] if row else None
@@ -146,14 +153,14 @@ def set_phase(conn, close_id, phase, actor) -> None:
         raise ValueError(f"unknown close phase: {phase!r}")
     if actor.kind == "human":
         raise NotAllowed("only an agent or system actor may change the close phase")
-    before = _close_or_raise(conn, close_id)["phase"]
+    before = _mutable_close(conn, close_id)["phase"]
     conn.execute("UPDATE closes SET phase = ? WHERE close_id = ?", (phase, close_id))
     append_event(conn, close_id, actor, "phase_changed", before=before, after=phase)
 
 
 def add_source(conn, source: Source, actor, chat_message_id: str | None = None) -> str:
     _human_message(actor, chat_message_id)
-    _close_or_raise(conn, source.close_id)
+    _mutable_close(conn, source.close_id)
     conn.execute(
         """INSERT INTO sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (*asdict(source).values(), actor_id(actor), _now()),
@@ -185,7 +192,7 @@ def source_for_sha(conn, close_id, sha256) -> Source | None:
 
 def add_claim(conn, claim, actor, chat_message_id: str | None = None) -> str:
     _human_message(actor, chat_message_id)
-    _close_or_raise(conn, claim.close_id)
+    _mutable_close(conn, claim.close_id)
     expected_unit = _ACTIVITY_UNITS.get(claim.activity) if isinstance(claim.activity, str) else None
     if expected_unit is None:
         raise ValueError(f"unsupported claim activity: {claim.activity!r}")
@@ -261,6 +268,7 @@ def set_status(conn, claim_id, new_status, actor, reason, chat_message_id=None) 
     if new_status == "VERIFIED" and not (actor.kind == "system" or actor.id == "watchdog"):
         raise NotAllowed("only the system or watchdog may set VERIFIED")
     claim = get_claim(conn, claim_id)
+    _mutable_close(conn, claim.close_id)
     conn.execute(
         "UPDATE claims SET status = ?, checked_by = ? WHERE claim_id = ?", (new_status, actor_id(actor), claim_id)
     )
@@ -280,6 +288,7 @@ def set_status(conn, claim_id, new_status, actor, reason, chat_message_id=None) 
 def set_factor(conn, claim_id, factor_id, factor_version, actor, reason, chat_message_id=None) -> None:
     _human_message(actor, chat_message_id)
     claim = get_claim(conn, claim_id)
+    _mutable_close(conn, claim.close_id)
     factor = get_factor(conn, factor_id)
     if factor["version"] != factor_version:
         raise ValueError(f"factor version mismatch for {factor_id!r}")
@@ -303,6 +312,7 @@ def set_factor(conn, claim_id, factor_id, factor_version, actor, reason, chat_me
 def supersede(conn, old_claim_id, new_claim_id, actor, reason, chat_message_id) -> None:
     _human_message(actor, chat_message_id)
     old = get_claim(conn, old_claim_id)
+    _mutable_close(conn, old.close_id)
     new = get_claim(conn, new_claim_id)
     if old.claim_id == new.claim_id:
         raise ValueError("a claim cannot supersede itself")
@@ -328,6 +338,7 @@ def add_calculation(conn, calc: Calculation) -> str:
     if calc.basis not in _CALCULATION_BASES:
         raise ValueError(f"calculation basis must be 'location', 'market' or None, not {calc.basis!r}")
     claim = get_claim(conn, calc.claim_id)
+    _mutable_close(conn, claim.close_id)
     previous = _latest_calculation_for_basis(conn, calc.claim_id, calc.basis)
     calc_id = calc.calc_id or next_id(conn, "CA")
     values = asdict(calc) | {
@@ -389,6 +400,7 @@ def _latest_calculation_for_basis(conn, claim_id, basis):
 
 
 def upsert_gap(conn, close_id, finding: Finding):
+    _mutable_close(conn, close_id)
     existing = conn.execute(
         "SELECT * FROM gaps WHERE close_id = ? AND finding_id = ?", (close_id, finding.finding_id)
     ).fetchone()
@@ -441,6 +453,7 @@ def get_gap_by_thread(conn, thread_root_message_id):
 
 
 def set_gap_thread(conn, close_id, gap_id, message_id) -> None:
+    _mutable_close(conn, close_id)
     gap = get_gap(conn, gap_id, close_id)
     if not message_id:
         raise ValueError("gap thread message_id is required")
@@ -464,6 +477,7 @@ def set_gap_thread(conn, close_id, gap_id, message_id) -> None:
 
 def resolve_gap(conn, close_id, gap_id, actor, chat_message_id, resolution) -> None:
     _human_message(actor, chat_message_id)
+    _mutable_close(conn, close_id)
     gap = get_gap(conn, gap_id, close_id)
     if gap.status != "OPEN":
         raise ValueError(f"gap {gap_id} is already resolved")
@@ -477,6 +491,7 @@ def resolve_gap(conn, close_id, gap_id, actor, chat_message_id, resolution) -> N
 
 def add_approval(conn, close_id, subject_type, subject_id, tier, actor, decision, reason, chat_message_id) -> str:
     _human_message(actor, chat_message_id)
+    _mutable_close(conn, close_id)
     if not chat_message_id:
         raise NeedsRoomEvent("approvals require a Switch chat_message_id")
     approval_id = f"AP-{conn.execute('SELECT COUNT(*) FROM approvals').fetchone()[0] + 1:04d}"
@@ -553,6 +568,7 @@ def find_factor(conn, source, version, activity, geography):
 
 
 def assign_s_tags(conn, close_id, version, calc_ids):
+    _mutable_close(conn, close_id)
     mapping = {}
     used_tags = {
         row["tag"] for row in conn.execute("SELECT tag FROM s_tags WHERE close_id=? AND version=?", (close_id, version))

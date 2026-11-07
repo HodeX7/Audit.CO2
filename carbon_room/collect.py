@@ -12,7 +12,7 @@ from carbon_room.ledger import ledger
 from carbon_room.ledger.audit import append_event
 from carbon_room.ledger.ids import next_id
 from carbon_room.ledger.locks import claim_lock
-from carbon_room.models import Actor, Claim, IngestReport, LockHeld, NeedsRoomEvent, Source
+from carbon_room.models import Actor, Claim, IngestReport, LockHeld, NeedsRoomEvent, NotAllowed, Source
 from carbon_room.sources import cache, cloud
 from carbon_room.sources import extract as model_extract
 from carbon_room.sources.period import parse_period
@@ -99,11 +99,14 @@ def ingest_file(
     site: str | None = None,
     month_from_period: bool = False,
     chat_message_id: str | None = None,
+    expected: tuple[str, str, str] | None = None,
 ) -> list[str]:
     """Store, read and record one source; source text, not a model, is the proof boundary."""
     if actor.kind == "human" and not chat_message_id:
         raise NeedsRoomEvent("human uploads require a Switch chat_message_id")
     close = ledger.get_close(conn, close_id)
+    if close["phase"] == "PUBLISHED":
+        raise NotAllowed("published close is immutable; start a new version")
     source_path = Path(path)
     kind, result = read(source_path)
     pages = result if isinstance(result, list) else []
@@ -143,6 +146,12 @@ def ingest_file(
             valid, extraction_error = [], period_error
         elif valid and period is None:
             valid, extraction_error = [], "billing period is required"
+        claim_month = period[0][:7] if period else close["month"]
+        if expected is not None and not any(
+            resolved_site == expected[0] and claim_month == expected[1] and candidate["activity"] == expected[2]
+            for candidate in valid
+        ):
+            raise ValueError("uploaded evidence has no matching current-period claim; gap stays open")
         source = Source(
             source_id,
             close_id,
@@ -163,7 +172,6 @@ def ingest_file(
         # close folder that happened to collect it.  The previous-period corpus
         # is deliberately collected with the close-month corpus for variance
         # checks, so using close["month"] here would corrupt that comparison.
-        claim_month = period[0][:7] if period else close["month"]
         claim_ids = []
         for candidate in valid:
             scope = {"diesel_l": "1", "dc_it_kwh": "DC"}.get(candidate["activity"], "2")
@@ -204,6 +212,8 @@ def ingest_file(
 def ingest(conn: sqlite3.Connection, close_id: str, actor: Actor) -> IngestReport:
     """Collect close-month and prior-month evidence, preserving each printed billing period."""
     close = ledger.get_close(conn, close_id)
+    if close["phase"] == "PUBLISHED":
+        raise NotAllowed("published close is immutable; start a new version")
     previous = (
         f"{int(close['month'][:4]) - (close['month'].endswith('-01')):04d}-{(int(close['month'][5:]) - 2) % 12 + 1:02d}"
     )

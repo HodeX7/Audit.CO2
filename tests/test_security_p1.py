@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from carbon_room import collect
 from carbon_room.ledger import ledger
 from carbon_room.models import Actor
@@ -68,3 +70,34 @@ def test_reader_rejects_symlinks_and_oversized_inputs(tmp_path, monkeypatch):
     link.symlink_to(target)
     monkeypatch.setattr(readers, "MAX_SOURCE_BYTES", 10 * 1024 * 1024)
     assert readers.read(link) == ("drive_csv", "unreadable linked.csv")
+
+
+def test_ingest_never_stores_a_symlink_target(db, tmp_path, monkeypatch):
+    close_id = ledger.create_close(db, "2026-10", ["warehouse-2"], "FS-test", SYSTEM, "audit-close")
+    db.commit()
+    target = tmp_path / "private.csv"
+    target.write_text("private data\nPeriod: 2026-10-01 to 2026-10-31\nUsage: 10 kWh", encoding="utf-8")
+    link = tmp_path / "warehouse-2.csv"
+    link.symlink_to(target)
+    real_store_file = collect.store_file
+    monkeypatch.setattr(collect, "store_file", lambda path: real_store_file(path, tmp_path / "store"))
+
+    with pytest.raises(ValueError, match="symlink"):
+        collect.ingest_file(db, close_id, link, SYSTEM, site="warehouse-2")
+    assert ledger.get_sources(db, close_id) == []
+    assert not (tmp_path / "store").exists()
+
+
+def test_ingest_does_not_copy_oversized_evidence(db, tmp_path, monkeypatch):
+    close_id = ledger.create_close(db, "2026-10", ["warehouse-2"], "FS-test", SYSTEM, "audit-close")
+    db.commit()
+    source = tmp_path / "warehouse-2.csv"
+    source.write_text("Period: 2026-10-01 to 2026-10-31\nUsage: 10 kWh", encoding="utf-8")
+    monkeypatch.setattr(readers, "MAX_SOURCE_BYTES", 4)
+    real_store_file = collect.store_file
+    monkeypatch.setattr(collect, "store_file", lambda path: real_store_file(path, tmp_path / "store"))
+
+    with pytest.raises(ValueError, match="size limit"):
+        collect.ingest_file(db, close_id, source, SYSTEM, site="warehouse-2")
+    assert ledger.get_sources(db, close_id) == []
+    assert not (tmp_path / "store").exists()

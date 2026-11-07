@@ -15,6 +15,7 @@ _RATIOS: dict[tuple[str, str], Decimal] = {
     ("kgCO2e", "tCO2e"): Decimal("0.001"),
     ("tCO2e", "kgCO2e"): Decimal(1000),
     ("tCO2e", "tCO2e"): Decimal(1),
+    ("lb/MWh", "kgCO2e/kWh"): KG_PER_LB / Decimal(1000),
 }
 
 KNOWN_FACTOR_UNITS = {"kgCO2e/kWh", "kgCO2e/L"}

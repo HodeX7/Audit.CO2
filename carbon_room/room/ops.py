@@ -4,7 +4,8 @@
 
 import json
 import logging
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
+
 import httpx
 
 log = logging.getLogger(__name__)

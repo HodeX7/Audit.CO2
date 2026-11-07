@@ -6,7 +6,8 @@ import argparse
 from dataclasses import asdict
 
 from carbon_room import core
-from carbon_room.ledger import connect, init_db, ledger
+from carbon_room.calc import factors
+from carbon_room.ledger import connect, ledger
 from carbon_room.models import Actor
 
 
@@ -34,8 +35,7 @@ def main() -> int:
     args = parser.parse_args()
     actor = Actor("system", "cli", "CLI")
     if args.command == "init":
-        with connect() as db:
-            init_db(db)
+        factors.prepare_ledger()
         print("initialized")
     elif args.command == "close":
         print(core.start_close(args.month, args.site, args.factor_set, actor, "cli-init"))

@@ -47,13 +47,43 @@ def add_claim(factor_db):
         start, end = period or (f"{month}-01", f"{month}-28")
         printed = f"Billing period: {start} to {end}"
         name = file_name or f"{site}_{activity}_{month}_{number}.pdf"
-        source = Source(f"SRC-{number:04d}", close, site, "utility_pdf", name, "stored", f"sha-{number}", 1,
-                        f"{printed}\nUsage: {value} {UNITS[activity]}", start, end, "OK", None)
+        source = Source(
+            f"SRC-{number:04d}",
+            close,
+            site,
+            "utility_pdf",
+            name,
+            "stored",
+            f"sha-{number}",
+            1,
+            f"{printed}\nUsage: {value} {UNITS[activity]}",
+            start,
+            end,
+            "OK",
+            None,
+        )
         ledger.add_source(factor_db, source, actors.CALCULATOR)
-        claim = Claim("", close, site, f"{year}-{mon:02d}", activity, Decimal(str(value)), UNITS[activity],
-                      {"diesel_l": "1", "dc_it_kwh": "DC"}.get(activity, "2"), source.source_doc_id,
-                      f"{value} {UNITS[activity]}", source.sha256, 0, None, None, "UNVERIFIED", "collector", None, None,
-                      attributes)
+        claim = Claim(
+            "",
+            close,
+            site,
+            f"{year}-{mon:02d}",
+            activity,
+            Decimal(str(value)),
+            UNITS[activity],
+            {"diesel_l": "1", "dc_it_kwh": "DC"}.get(activity, "2"),
+            source.source_doc_id,
+            f"{value} {UNITS[activity]}",
+            source.sha256,
+            0,
+            None,
+            None,
+            "UNVERIFIED",
+            "collector",
+            None,
+            None,
+            attributes,
+        )
         return ledger.add_claim(factor_db, claim, actors.CALCULATOR)
 
     return build
@@ -62,7 +92,8 @@ def add_claim(factor_db):
 @pytest.fixture
 def close_id(factor_db):
     """An October close over the three configured sites, locked to the default factor set."""
-    created = ledger.create_close(factor_db, "2026-10", BOUNDARY, config.load_config()["default_factor_set"],
-                                  actors.CALCULATOR, "msg-start")
+    created = ledger.create_close(
+        factor_db, "2026-10", BOUNDARY, config.load_config()["default_factor_set"], actors.CALCULATOR, "msg-start"
+    )
     factor_db.commit()
     return created

@@ -4,23 +4,26 @@ Depends on (must be merged): SPEC-12, SPEC-13, SPEC-14; **P2's `calculate`, `che
 `draft_report` and `publish` on `main`**; `config/carbon_room.yaml` and `config/factors.csv`; `data/seed/EXPECTED.md`
 · Wave: 5 · Estimated session time: 2 h
 
-> **BLOCKED until §0 is filled in from `data/seed/EXPECTED.md`** and P2's core has landed. Re-read P2's answers to
-> plan §1.4 before execution and record them in §11. **Executor: if any `TBD` is left, stop and report.**
+> **Local integration update (7 Nov).** The real P2 core and generated `data/seed/EXPECTED.md` are present in
+> this unmerged worktree. The room flow runs in `tests/room/test_real_core_flow.py`. Merge and live Switch checks
+> remain separate release gates; these offline figures do not certify a deployed room.
+> The older FakeCore uses G-2 for diesel; the real seed uses G-1. Demo instructions must read the actual gap id
+> from the Watchdog root instead of assuming fake-core numbering.
 
 ## 0. Inputs from `EXPECTED.md` and P2
 
 | Item | Value |
 |---|---|
-| Open gaps after the first check: rule · kind · owner for each, in gap-number order | `TBD` |
-| Is Warehouse-2's R1 and R4 one gap or two? | `TBD` |
-| Does R6 open a gap? | `TBD` |
-| `summary` after check: verified kg, excluded kg, coverage %, sources verified | `TBD` |
-| After the Warehouse-2 upload | `TBD` |
-| After diesel `pick A` | `TBD` |
-| After stale-factor `approve` | `TBD` |
-| After variance `approve` | `TBD` |
-| Option keys per rule, if they differ from contracts §6 | `TBD` |
-| Files `publish` writes under `out/<month>/v<n>/` | `TBD` |
+| Open gaps after the first check: rule · kind · owner for each, in gap-number order | R2 · CONFLICTING · lead; R3 · STALE · lead; R4 · PERIOD · priya; R5 · VARIANCE · lead |
+| Is Warehouse-2's R1 and R4 one gap or two? | One R4 period gap carries the R1 missing consequence. |
+| Does R6 open a gap? | No; it is an informational finding with no resolution option. |
+| `summary` after check: verified kg, excluded kg, coverage %, sources verified | 0; 24686.90828783499300; 0; 0/4 |
+| After the Warehouse-2 upload | 2422.76000; 24686.90828783499300; 9; 1/4 |
+| After diesel `pick A` | 8623.25600; 13319.33228783499300; 39; 2/4 |
+| After stale-factor `approve` | 12521.6096000; 9420.28748783499300; 57; 3/4 |
+| After variance `approve` | 21941.89708783499300; 0; 100; 4/4 |
+| Option keys per rule, if they differ from contracts §6 | R4 `upload`; R2 `pick A`/`pick B`; R3 and R5 `approve`/`reject`. |
+| Files `publish` writes under `out/<month>/v<n>/` | `report.json`, `report.md`, `coverage.html`, `report.pdf` |
 
 ## 1. Goal
 Run the room's close and resolution handlers against the **real** `carbon_room.core`, in a temp copy of the repo
@@ -94,7 +97,6 @@ This test is the dress rehearsal for M5: run it, then `make reset-demo` and do t
 Fixing P2's code. Report mismatches to P2 with the failing snapshot.
 
 ## 11. Open questions
-1. **Blocking:** §0, which depends on P2 and on `EXPECTED.md`.
-2. How factors are loaded before a close (P1 handoff: P2 loads immutable factor rows). Record the call here.
-3. Plan §1.3 P1 defects 1 and 2 (baseline month stamping, diesel scope) will show up here as wrong totals. Check
-   that they are fixed on `main` before filling §0.
+1. §0 is filled from the local real-core flow; merging P2/P3 and repeating the check on `main` remain release gates.
+2. Factors are loaded before the close with `carbon_room.calc.factors.load(conn)` after `init_db(conn)`.
+3. Baseline month stamping and diesel Scope 1 are covered by the current tests; rerun after merge.

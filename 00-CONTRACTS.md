@@ -291,7 +291,7 @@ Each rule produces a Finding with fixed option keys. P3's router matches a human
 2. No OPEN gap with `blocking=True` lists it.
 3. Either Tier 1 applies (same factor version as the previous month's claim for that site and activity, variance below threshold, source present), **or** there is an `approve` approval for it.
 
-Otherwise its status is the strongest open finding on it: `CONFLICTING` > `STALE` > `UNVERIFIED`. A VERIFIED claim never goes back; a new close version starts over.
+Otherwise its status is the strongest open finding on it: `CONFLICTING` > `STALE` > `UNVERIFIED`. Before publication, a newly blocking finding or human rejection may demote a VERIFIED claim, with an audit event, so a blocked row cannot remain in the verified total. A PUBLISHED close and its report remain immutable; later evidence starts a new close version.
 
 **Totals:**
 - Only claims whose `month` equals the close month count. Previous-month claims are ingested into the same close as a baseline for R5 and Tier 1, and are never added to a total.

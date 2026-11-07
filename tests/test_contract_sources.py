@@ -19,6 +19,17 @@ def test_store_is_content_addressed(tmp_path):
     assert first[1] == hashlib.sha256(b"value").hexdigest()
 
 
+def test_store_rejects_a_corrupt_existing_content_address(tmp_path):
+    source = tmp_path / "invoice.csv"
+    source.write_bytes(b"trusted evidence")
+    digest = hashlib.sha256(b"trusted evidence").hexdigest()
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / f"{digest}.csv").write_bytes(b"different bytes")
+    with pytest.raises(ValueError, match="stored evidence hash mismatch"):
+        store_file(source, store)
+
+
 def test_period_formats_and_verbatim_evidence_validation():
     assert parse_period("Billing period: 1 Sep 2026 – 30 Sep 2026") == ("2026-09-01", "2026-09-30")
     assert parse_period("Period: 2026-09-01 to 2026-09-30") == ("2026-09-01", "2026-09-30")

@@ -79,7 +79,7 @@ def _room_id(env: Mapping[str, str]) -> Check:
     if env.get("SWITCH_ROOM_ID", "").strip():
         return Check(CHECK_NAMES[3], True, "", "")
     return Check(CHECK_NAMES[3], False, "SWITCH_ROOM_ID is not set",
-                 "Create the october-close room and put its id in .env as SWITCH_ROOM_ID "
+                 "Create the emissions-reporting room and put its id in .env as SWITCH_ROOM_ID "
                  "(docs/setup-switch.md).")
 
 

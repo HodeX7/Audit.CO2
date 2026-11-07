@@ -21,11 +21,31 @@ def factor(spec):
 
 
 def claim(activity="electricity_kwh", value="48300", unit="kWh", site="hq"):
-    return Claim("CL-X", "2026-10-v1", site, "2026-10", activity, D(value), unit, "2", "SRC-1", "x", "sha", 0,
-                 None, None, "UNVERIFIED", "collector", None, None, {})
+    return Claim(
+        "CL-X",
+        "2026-10-v1",
+        site,
+        "2026-10",
+        activity,
+        D(value),
+        unit,
+        "2",
+        "SRC-1",
+        "x",
+        "sha",
+        0,
+        None,
+        None,
+        "UNVERIFIED",
+        "collector",
+        None,
+        None,
+        {},
+    )
 
 
 # 2.2 compute ---------------------------------------------------------------------------------------------------------
+
 
 def test_the_checklist_example_formula_is_reproduced_exactly():
     calc = calculator.compute(claim(value="48200"), factor(("X", "1", "0.20705", "kgCO2e/kWh")))
@@ -65,6 +85,7 @@ def test_data_centre_claims_are_not_priced_here():
 
 # 2.5 recompute -------------------------------------------------------------------------------------------------------
 
+
 def test_recompute_matches_what_was_stored():
     stored = calculator.compute(claim(), factor(EGRID))
     formula, kg, matches = calculator.recompute(stored, claim(), factor(EGRID))
@@ -81,6 +102,7 @@ def test_recompute_detects_a_changed_result_input_or_factor():
 
 
 # 2.3 calculate -------------------------------------------------------------------------------------------------------
+
 
 @pytest.fixture
 def october(factor_db, close_id, add_claim):
@@ -112,18 +134,17 @@ def test_the_october_hq_electricity_claim_gets_the_expected_calculation(factor_d
 
 def test_the_factor_choice_is_recorded_on_the_claim_and_in_the_audit_log(factor_db, close_id, october):
     run.calculate(factor_db, close_id)
-    events = factor_db.execute("SELECT actor, reason FROM events WHERE kind='factor_set' AND claim_id=?",
-                               (october["w2"],)).fetchall()
+    events = factor_db.execute(
+        "SELECT actor, reason FROM events WHERE kind='factor_set' AND claim_id=?", (october["w2"],)
+    ).fetchall()
     assert [(e["actor"], e["reason"]) for e in events] == [("calculator", "factor chosen at calculation")]
     assert ledger.get_claim(factor_db, october["w2"]).factor_version == "2026"
 
 
-def test_data_centre_claims_are_left_alone_but_the_skip_is_announced(factor_db, close_id, october, caplog):
-    with caplog.at_level("WARNING", logger="carbon_room.calc.run"):
-        results = run.calculate(factor_db, close_id)
-    assert ledger.latest_calculation(factor_db, october["dc"]) is None
-    assert len(results) == 4
-    assert any(october["dc"] in message and "data-centre" in message for message in caplog.messages)
+def test_data_centre_claim_receives_a_location_calculation(factor_db, close_id, october):
+    results = run.calculate(factor_db, close_id)
+    assert ledger.latest_calculation(factor_db, october["dc"], "location").kgco2e == D("3898.3536")
+    assert len(results) == 5
 
 
 def test_running_twice_adds_no_calculations_and_no_events(factor_db, close_id, october):
@@ -131,13 +152,21 @@ def test_running_twice_adds_no_calculations_and_no_events(factor_db, close_id, o
     calcs = factor_db.execute("SELECT COUNT(*) FROM calculations").fetchone()[0]
     events = factor_db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
     run.calculate(factor_db, close_id)
-    assert factor_db.execute("SELECT COUNT(*) FROM calculations").fetchone()[0] == calcs == 4
+    assert factor_db.execute("SELECT COUNT(*) FROM calculations").fetchone()[0] == calcs == 5
     assert factor_db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == events
 
 
-EXTRA_DEFRA_2025 = {"factor_id": "DEFRA-2025-UK-electricity_kwh", "source": "DEFRA", "version": "2025", "year": "2025",
-                    "activity": "electricity_kwh", "geography": "UK", "value": "0.20705", "unit": "kgCO2e/kWh",
-                    "citation": "test-only older edition"}
+EXTRA_DEFRA_2025 = {
+    "factor_id": "DEFRA-2025-UK-electricity_kwh",
+    "source": "DEFRA",
+    "version": "2025",
+    "year": "2025",
+    "activity": "electricity_kwh",
+    "geography": "UK",
+    "value": "0.20705",
+    "unit": "kgCO2e/kWh",
+    "citation": "test-only older edition",
+}
 
 
 def force_factor(db, claim_id, factor_id, version):
@@ -156,21 +185,26 @@ def test_a_valid_factor_a_human_chose_is_respected_and_the_old_calculation_super
     assert ledger.latest_calculation(factor_db, october["w2"]).kgco2e == D("3726.9")  # 18000 x 0.20705
 
 
-@pytest.mark.parametrize("claim_key, factor_id, version, why", [
-    ("w2", "DEFRA-2026-UK-diesel_l", "2026", "activity"),                          # litres factor on a kWh claim
-    ("w2", "EGRID-2023-CAMX-electricity_kwh", "2023", "source"),                   # US grid on a UK site
-    ("hq_elec", "DEFRA-2026-UK-electricity_kwh", "2026", "source"),                # UK grid on a US site
-    ("diesel", "DEFRA-2026-UK-electricity_kwh", "2026", "activity"),               # electricity factor on diesel
-])
+@pytest.mark.parametrize(
+    "claim_key, factor_id, version, why",
+    [
+        ("w2", "DEFRA-2026-UK-diesel_l", "2026", "activity"),  # litres factor on a kWh claim
+        ("w2", "EGRID-2023-CAMX-electricity_kwh", "2023", "source"),  # US grid on a UK site
+        ("hq_elec", "DEFRA-2026-UK-electricity_kwh", "2026", "source"),  # UK grid on a US site
+        ("diesel", "DEFRA-2026-UK-electricity_kwh", "2026", "activity"),  # electricity factor on diesel
+    ],
+)
 def test_a_factor_outside_the_sites_prescribed_source_or_activity_is_refused(
-        factor_db, close_id, october, claim_key, factor_id, version, why):
+    factor_db, close_id, october, claim_key, factor_id, version, why
+):
     force_factor(factor_db, october[claim_key], factor_id, version)
     with pytest.raises(factors.FactorNotAllowed, match=why):
         run.calculate(factor_db, close_id)
 
 
-def test_an_older_edition_of_the_prescribed_source_is_allowed_so_the_stale_rule_can_judge_it(factor_db, close_id,
-                                                                                         october):
+def test_an_older_edition_of_the_prescribed_source_is_allowed_so_the_stale_rule_can_judge_it(
+    factor_db, close_id, october
+):
     ledger.load_factors(factor_db, [EXTRA_DEFRA_2025])
     force_factor(factor_db, october["w2"], "DEFRA-2025-UK-electricity_kwh", "2025")
     run.calculate(factor_db, close_id)  # must not raise; deciding it is stale is the Watchdog's job
@@ -211,4 +245,4 @@ def test_a_missing_catalogue_row_names_the_site_and_activity(db):
 
 def test_core_calculate_is_wired_to_the_calculator(factor_db, close_id, october, monkeypatch):
     monkeypatch.setattr(core, "connect", lambda: factor_db)
-    assert len(core.calculate(close_id)) == 4
+    assert len(core.calculate(close_id)) == 5

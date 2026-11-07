@@ -1,0 +1,9 @@
+{
+  "disclaimer": "General information for a human reviewer, not legal advice.",
+  "flags": {
+    "incomplete_coverage": "Do not describe this total as complete. Excluded or missing evidence is not counted.",
+    "market_zero": "Label the market-based figure as certificate-based. Certificate quality has not been verified.",
+    "ai_unverified": "State that the AI line is unverified. The vendor has not supplied per-model workload data.",
+    "scope3_missing": "Do not imply that unlisted Scope 3 categories are zero. Listed categories have no data, not zero."
+  }
+}
